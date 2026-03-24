@@ -960,9 +960,163 @@ const BreakPipeLayer = () => {
 // Endpoint Snap Layer
 // ----------------------------------------------------
 const EndpointSnapLayer = () => {
-    // Legacy snap connection logic removed;
-    // We already have generic Drag editing and global Object Snaps.
-    return null;
+    const canvasMode = useStore(state => state.canvasMode);
+    const setCanvasMode = useStore(state => state.setCanvasMode);
+    const dataTable = useStore(state => state.dataTable);
+    const updateDataTable = useStore(state => state.updateDataTable);
+    const pushHistory = useStore(state => state.pushHistory);
+    const { dispatch } = useAppContext();
+
+    const [connectDraft, setConnectDraft] = useState(null);
+    const [cursorPos, setCursorPos] = useState(new THREE.Vector3());
+
+    // Only active in CONNECT mode
+    if (canvasMode !== 'CONNECT') return null;
+
+    const snapRadius = 50; // mm
+
+    const handlePointerMove = (e) => {
+        setCursorPos(e.point);
+        let nearest = null;
+        let minDist = snapRadius;
+
+        dataTable.forEach((row) => {
+            ['ep1', 'ep2'].forEach(epKey => {
+                const ep = row[epKey];
+                if (ep) {
+                    const pt = new THREE.Vector3(parseFloat(ep.x), parseFloat(ep.y), parseFloat(ep.z));
+                    const d = pt.distanceTo(e.point);
+                    if (d < minDist) {
+                        minDist = d;
+                        nearest = { row, epKey, position: pt };
+                    }
+                }
+            });
+        });
+
+        // We already use useStore(cursorSnapPoint) globally but here we need
+        // to manage click/drag specifically for stretching endpoints.
+        // We'll rely on the global snap point for visuals, but we handle the dragging here.
+    };
+
+    const handlePointerDown = (e) => {
+        e.stopPropagation();
+        let nearest = null;
+        let minDist = snapRadius;
+
+        dataTable.forEach((row) => {
+            ['ep1', 'ep2'].forEach(epKey => {
+                const ep = row[epKey];
+                if (ep) {
+                    const pt = new THREE.Vector3(parseFloat(ep.x), parseFloat(ep.y), parseFloat(ep.z));
+                    const d = pt.distanceTo(e.point);
+                    if (d < minDist) {
+                        minDist = d;
+                        nearest = { rowIndex: row._rowIndex, epKey, position: pt };
+                    }
+                }
+            });
+        });
+
+        if (nearest) {
+            setConnectDraft({ fromRowIndex: nearest.rowIndex, fromEP: nearest.epKey, fromPosition: nearest.position });
+        }
+    };
+
+    const handlePointerUp = (e) => {
+        if (!connectDraft) return;
+        e.stopPropagation();
+
+        let nearest = null;
+        let minDist = snapRadius;
+
+        dataTable.forEach((row) => {
+            ['ep1', 'ep2'].forEach(epKey => {
+                const ep = row[epKey];
+                if (ep) {
+                    const pt = new THREE.Vector3(parseFloat(ep.x), parseFloat(ep.y), parseFloat(ep.z));
+                    const d = pt.distanceTo(e.point);
+                    if (d < minDist) {
+                        minDist = d;
+                        nearest = { rowIndex: row._rowIndex, epKey, position: pt };
+                    }
+                }
+            });
+        });
+
+        // If dropped on another valid snap point
+        if (nearest && (nearest.rowIndex !== connectDraft.fromRowIndex || nearest.epKey !== connectDraft.fromEP)) {
+            pushHistory('Snap Connect');
+
+            const sourceRow = dataTable.find(r => r._rowIndex === connectDraft.fromRowIndex);
+            if (sourceRow) {
+                const newRow = {
+                    ...sourceRow,
+                    [connectDraft.fromEP]: { x: nearest.position.x, y: nearest.position.y, z: nearest.position.z }
+                };
+
+                // Fast local update
+                updateDataTable([newRow]);
+
+                // Slow global update
+                dispatch({
+                    type: 'BATCH_UPDATE_SUPPORT_ATTRS', // Using existing batch case for arbitrary updates
+                    payload: { rowIndices: [sourceRow._rowIndex], attrs: { [connectDraft.fromEP]: newRow[connectDraft.fromEP] } }
+                });
+
+                dispatch({
+                    type: 'ADD_LOG',
+                    payload: { type: 'Applied/Fix', stage: 'CONNECT_TOOL', message: `Stretched Row ${sourceRow._rowIndex} ${connectDraft.fromEP} to Row ${nearest.rowIndex} ${nearest.epKey}.` }
+                });
+            }
+        }
+
+        setConnectDraft(null);
+        setCanvasMode('VIEW');
+    };
+
+    return (
+        <group>
+            {/* Transparent capture plane for CONNECT mode */}
+            <mesh
+                visible={false}
+                scale={100000}
+                rotation={[-Math.PI / 2, 0, 0]}
+                onPointerMove={handlePointerMove}
+                onPointerDown={handlePointerDown}
+                onPointerUp={handlePointerUp}
+            >
+                <planeGeometry />
+                <meshBasicMaterial transparent opacity={0} depthTest={false} />
+            </mesh>
+
+            {/* Draw snap targets on every EP */}
+            {dataTable.map(row => {
+                const pts = [];
+                if (row.ep1) pts.push(new THREE.Vector3(parseFloat(row.ep1.x), parseFloat(row.ep1.y), parseFloat(row.ep1.z)));
+                if (row.ep2) pts.push(new THREE.Vector3(parseFloat(row.ep2.x), parseFloat(row.ep2.y), parseFloat(row.ep2.z)));
+                return pts.map((pt, i) => (
+                    <mesh key={`snap-${row._rowIndex}-${i}`} position={pt} renderOrder={999}>
+                        <sphereGeometry args={[20, 16, 16]} />
+                        <meshBasicMaterial color="#eab308" transparent opacity={0.5} depthTest={false} />
+                    </mesh>
+                ));
+            })}
+
+            {/* Draw active connection line */}
+            {connectDraft && (
+                <Line
+                    points={[connectDraft.fromPosition, cursorPos]}
+                    color="#eab308"
+                    lineWidth={3}
+                    dashed
+                    dashSize={20}
+                    gapSize={10}
+                    depthTest={false}
+                />
+            )}
+        </group>
+    );
 };
 
 // ----------------------------------------------------
