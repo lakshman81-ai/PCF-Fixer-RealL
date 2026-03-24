@@ -26,15 +26,92 @@ const TYPE_CONFIG = {
 };
 const typeColor = (type) => (TYPE_CONFIG[(type||'').toUpperCase()] || { color: '#64748b' }).color;
 
+// Spool logic
+const computeSpools = (dataTable) => {
+    const spools = {}; // rowIndex -> spoolId
+    let spoolCounter = 1;
+
+    // Adjacency map
+    const endpoints = {}; // "x,y,z" -> [rowIndex]
+    dataTable.forEach(r => {
+        if ((r.type||'').toUpperCase() === 'SUPPORT') return; // Supports don't route spools
+        if (r.ep1) { const key = `${parseFloat(r.ep1.x).toFixed(1)},${parseFloat(r.ep1.y).toFixed(1)},${parseFloat(r.ep1.z).toFixed(1)}`; if (!endpoints[key]) endpoints[key] = []; endpoints[key].push(r._rowIndex); }
+        if (r.ep2) { const key = `${parseFloat(r.ep2.x).toFixed(1)},${parseFloat(r.ep2.y).toFixed(1)},${parseFloat(r.ep2.z).toFixed(1)}`; if (!endpoints[key]) endpoints[key] = []; endpoints[key].push(r._rowIndex); }
+    });
+
+    const visited = new Set();
+    const rows = new Map(dataTable.map(r => [r._rowIndex, r]));
+
+    const floodFill = (startId, sId) => {
+        const queue = [startId];
+        while (queue.length > 0) {
+            const currId = queue.shift();
+            if (visited.has(currId)) continue;
+
+            const curr = rows.get(currId);
+            if (!curr) continue;
+
+            visited.add(currId);
+            spools[currId] = sId;
+
+            // Stop spool flood across flanges, valves, or pipeline ref changes
+            const currType = (curr.type || '').toUpperCase();
+            if (currType === 'FLANGE' || currType === 'VALVE' || currType === 'SUPPORT') continue;
+
+            const neighbors = new Set();
+            if (curr.ep1) { const key = `${parseFloat(curr.ep1.x).toFixed(1)},${parseFloat(curr.ep1.y).toFixed(1)},${parseFloat(curr.ep1.z).toFixed(1)}`; (endpoints[key] || []).forEach(n => neighbors.add(n)); }
+            if (curr.ep2) { const key = `${parseFloat(curr.ep2.x).toFixed(1)},${parseFloat(curr.ep2.y).toFixed(1)},${parseFloat(curr.ep2.z).toFixed(1)}`; (endpoints[key] || []).forEach(n => neighbors.add(n)); }
+
+            neighbors.forEach(nId => {
+                if (!visited.has(nId) && nId !== currId) {
+                    const neighbor = rows.get(nId);
+                    if (neighbor) {
+                        const nType = (neighbor.type || '').toUpperCase();
+                        // Only flood into pipes, bends, tees, olets. We stop *after* hitting a flange/valve, but do we include the flange?
+                        // Yes, the first flange belongs to the spool. But we don't route *past* it.
+                        // So if neighbor is flange/valve, we add it, but its own floodFill loop will terminate immediately (see `if currType === FLANGE continue` above).
+
+                        // We also break if pipeline refs differ (assuming both exist)
+                        if (curr.pipelineRef && neighbor.pipelineRef && curr.pipelineRef !== neighbor.pipelineRef) return;
+
+                        queue.push(nId);
+                    }
+                }
+            });
+        }
+    };
+
+    dataTable.forEach(r => {
+        if (!visited.has(r._rowIndex)) {
+            floodFill(r._rowIndex, spoolCounter++);
+        }
+    });
+
+    return spools;
+};
+
+// Generates distinct colors based on ID
+const spoolColor = (spoolId) => {
+    const colors = ['#f87171', '#fb923c', '#facc15', '#4ade80', '#2dd4bf', '#60a5fa', '#818cf8', '#c084fc', '#f472b6'];
+    if (!spoolId) return '#64748b';
+    return colors[spoolId % colors.length];
+};
+
 // ----------------------------------------------------
 // Performance Optimized Instanced Pipes Rendering
 // ----------------------------------------------------
 const InstancedPipes = () => {
   const getPipes = useStore(state => state.getPipes);
+  const colorMode = useStore(state => state.colorMode);
+  const dataTable = useStore(state => state.dataTable);
   const pipes = getPipes();
   const meshRef = useRef();
 
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  const c = useMemo(() => new THREE.Color(), []);
+
+  // Compute spools globally if needed
+  const spools = useMemo(() => computeSpools(dataTable), [dataTable]);
 
   useEffect(() => {
     if (!meshRef.current || pipes.length === 0) return;
@@ -66,11 +143,17 @@ const InstancedPipes = () => {
 
       dummy.updateMatrix();
       meshRef.current.setMatrixAt(i, dummy.matrix);
+
+      // Color
+      const colStr = colorMode === 'SPOOL' ? spoolColor(spools[element._rowIndex]) : typeColor(element.type);
+      c.set(colStr);
+      meshRef.current.setColorAt(i, c);
     });
 
     meshRef.current.instanceMatrix.needsUpdate = true;
+    if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
     meshRef.current.computeBoundingSphere();
-  }, [pipes, dummy]);
+  }, [pipes, dummy, colorMode, spools, c]);
 
   const [selectedGeom, setSelectedGeom] = useState(null);
 
@@ -95,7 +178,8 @@ const InstancedPipes = () => {
 
               useStore.getState().setSelected(pipe._rowIndex);
 
-              window.dispatchEvent(new CustomEvent('canvas-focus-point', { detail: { x: midX, y: midY, z: midZ, dist: distance } }));
+              // Do not dispatch canvas-focus-point automatically anymore.
+              // Instead, we just set the selection for the property panel.
           }
       }
   };
@@ -131,6 +215,11 @@ const InstancedPipes = () => {
 const ImmutableComponents = () => {
   const getImmutables = useStore(state => state.getImmutables);
   const elements = getImmutables();
+  const colorMode = useStore(state => state.colorMode);
+  const dataTable = useStore(state => state.dataTable);
+
+  // Re-use compute spools if needed here
+  const spools = useMemo(() => computeSpools(dataTable), [dataTable]);
 
   if (elements.length === 0) return null;
 
@@ -149,13 +238,18 @@ const ImmutableComponents = () => {
         const up  = new THREE.Vector3(0, 1, 0);
         const quat = new THREE.Quaternion().setFromUnitVectors(up, dir);
         const r = el.bore ? el.bore / 2 : 5;
-        const color = typeColor(el.type);
+        const color = colorMode === 'SPOOL' ? spoolColor(spools[el._rowIndex]) : typeColor(el.type);
         const type = (el.type || '').toUpperCase();
+
+        const handleSelect = (e) => {
+          e.stopPropagation();
+          useStore.getState().setSelected(el._rowIndex);
+        };
 
         if (type === 'FLANGE') {
           // Disc — short, wide cylinder
           return (
-            <mesh key={`fl-${i}`} position={mid} quaternion={quat}>
+            <mesh key={`fl-${i}`} position={mid} quaternion={quat} onPointerDown={handleSelect}>
               <cylinderGeometry args={[r * 1.6, r * 1.6, Math.max(dist * 0.15, 10), 24]} />
               <meshStandardMaterial color={color} />
             </mesh>
@@ -165,7 +259,7 @@ const ImmutableComponents = () => {
         if (type === 'VALVE') {
           // Box body
           return (
-            <mesh key={`vv-${i}`} position={mid} quaternion={quat}>
+            <mesh key={`vv-${i}`} position={mid} quaternion={quat} onPointerDown={handleSelect}>
               <boxGeometry args={[r * 2.2, dist, r * 2.2]} />
               <meshStandardMaterial color={color} />
             </mesh>
@@ -175,7 +269,7 @@ const ImmutableComponents = () => {
         if (type === 'BEND') {
           // Slightly thicker cylinder in amber — no torus without 3 points; keep cylinder with distinct colour
           return (
-            <mesh key={`bn-${i}`} position={mid} quaternion={quat}>
+            <mesh key={`bn-${i}`} position={mid} quaternion={quat} onPointerDown={handleSelect}>
               <cylinderGeometry args={[r * 1.1, r * 1.1, dist, 16]} />
               <meshStandardMaterial color={color} />
             </mesh>
@@ -200,7 +294,7 @@ const ImmutableComponents = () => {
           const branchQuat = new THREE.Quaternion().setFromUnitVectors(up, branchDir);
           const branchR = el.branchBore ? el.branchBore / 2 : r * 0.6;
           return (
-            <group key={`tee-${i}`}>
+            <group key={`tee-${i}`} onPointerDown={handleSelect}>
               <mesh position={mid} quaternion={quat}>
                 <cylinderGeometry args={[r, r, dist, 16]} />
                 <meshStandardMaterial color={color} />
@@ -219,16 +313,29 @@ const ImmutableComponents = () => {
             ? [el.cp.x, el.cp.y, el.cp.z]
             : [mid.x, mid.y, mid.z];
           return (
-            <mesh key={`ol-${i}`} position={pos}>
+            <mesh key={`ol-${i}`} position={pos} onPointerDown={handleSelect}>
               <sphereGeometry args={[r * 1.3, 12, 12]} />
               <meshStandardMaterial color={color} />
             </mesh>
           );
         }
 
+        if (type === 'SUPPORT') {
+          // A visible structural stub (often vertical to a beam)
+          // Renders a box at midpoint extending to ep2 (usually the structural attachment point)
+          // Actually, support is often just ep1 (attachment) and ep2 (beam).
+          return (
+            <mesh key={`supp-${i}`} position={mid} quaternion={quat} onPointerDown={handleSelect}>
+              {/* Thin, distinct square profile instead of cylinder */}
+              <boxGeometry args={[r * 1.5, dist, r * 1.5]} />
+              <meshStandardMaterial color="#94a3b8" />
+            </mesh>
+          );
+        }
+
         // Fallback: generic cylinder
         return (
-          <mesh key={`im-${i}`} position={mid} quaternion={quat}>
+          <mesh key={`im-${i}`} position={mid} quaternion={quat} onPointerDown={handleSelect}>
             <cylinderGeometry args={[r, r, dist, 16]} />
             <meshStandardMaterial color={color} />
           </mesh>
@@ -286,10 +393,21 @@ const DraggableComponents = ({ snapResolution, onDragCommit, orbitRef }) => {
     if (!ray.intersectPlane(dragPlane, intersect)) return;
     const rawDelta = intersect.clone().sub(dragState.hitPoint);
 
+    const orthoMode = useStore.getState().orthoMode;
+
     // Axis Lock Logic
     if (dragAxisLock === 'X') { rawDelta.y = 0; rawDelta.z = 0; }
-    if (dragAxisLock === 'Y') { rawDelta.x = 0; rawDelta.z = 0; }
-    if (dragAxisLock === 'Z') { rawDelta.x = 0; rawDelta.y = 0; }
+    else if (dragAxisLock === 'Y') { rawDelta.x = 0; rawDelta.z = 0; }
+    else if (dragAxisLock === 'Z') { rawDelta.x = 0; rawDelta.y = 0; }
+    else if (orthoMode) {
+      // Find major axis and zero out others
+      const absX = Math.abs(rawDelta.x);
+      const absY = Math.abs(rawDelta.y);
+      const absZ = Math.abs(rawDelta.z);
+      if (absX >= absY && absX >= absZ) { rawDelta.y = 0; rawDelta.z = 0; }
+      else if (absY >= absX && absY >= absZ) { rawDelta.x = 0; rawDelta.z = 0; }
+      else { rawDelta.x = 0; rawDelta.y = 0; }
+    }
 
     const snapped = new THREE.Vector3(snapV(rawDelta.x), snapV(rawDelta.y), snapV(rawDelta.z));
     setDragState(prev => prev ? { ...prev, delta: snapped } : null);
@@ -703,18 +821,204 @@ const SingleIssuePanel = ({ proposals, validationIssues, currentIssueIndex, setC
 };
 
 // ----------------------------------------------------
+// Global Snap Layer
+// Provides a unified snapping point for Measure, Break, etc.
+// ----------------------------------------------------
+const GlobalSnapLayer = () => {
+    const canvasMode = useStore(state => state.canvasMode);
+    const dataTable = useStore(state => state.dataTable);
+    const setCursorSnapPoint = useStore(state => state.setCursorSnapPoint);
+    const cursorSnapPoint = useStore(state => state.cursorSnapPoint);
+
+    // Only active during tools that need picking
+    const isActive = ['MEASURE', 'BREAK', 'CONNECT', 'INSERT_SUPPORT'].includes(canvasMode);
+
+    useEffect(() => {
+        if (!isActive) {
+            setCursorSnapPoint(null);
+        }
+    }, [isActive, setCursorSnapPoint]);
+
+    if (!isActive) return null;
+
+    const snapRadius = 50; // mm
+
+    const handlePointerMove = (e) => {
+        let nearest = null;
+        let minDist = snapRadius;
+
+        // Find closest ep1, ep2, or midpoint
+        dataTable.forEach(row => {
+            const ptsToTest = [];
+            if (row.ep1) ptsToTest.push(new THREE.Vector3(row.ep1.x, row.ep1.y, row.ep1.z));
+            if (row.ep2) ptsToTest.push(new THREE.Vector3(row.ep2.x, row.ep2.y, row.ep2.z));
+            if (row.ep1 && row.ep2) {
+                const mid = new THREE.Vector3(row.ep1.x, row.ep1.y, row.ep1.z)
+                    .lerp(new THREE.Vector3(row.ep2.x, row.ep2.y, row.ep2.z), 0.5);
+                ptsToTest.push(mid);
+            }
+
+            ptsToTest.forEach(pt => {
+                const dist = pt.distanceTo(e.point);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = pt;
+                }
+            });
+        });
+
+        if (nearest) {
+            // Update state ONLY if point changed to avoid re-renders
+            if (!cursorSnapPoint || cursorSnapPoint.distanceTo(nearest) > 0.1) {
+                setCursorSnapPoint(nearest);
+            }
+        } else if (cursorSnapPoint) {
+            setCursorSnapPoint(null);
+        }
+    };
+
+    return (
+        <group onPointerMove={handlePointerMove}>
+            {/* Click plane for generic move events */}
+            <mesh visible={false}>
+                <planeGeometry args={[200000, 200000]} />
+            </mesh>
+
+            {cursorSnapPoint && (
+                <mesh position={cursorSnapPoint} renderOrder={999}>
+                    <sphereGeometry args={[15, 16, 16]} />
+                    <meshBasicMaterial color="#eab308" transparent opacity={0.8} depthTest={false} />
+                </mesh>
+            )}
+        </group>
+    );
+};
+
+// ----------------------------------------------------
+// Marquee Overlay
+// ----------------------------------------------------
+const MarqueeLayer = () => {
+    const canvasMode = useStore(state => state.canvasMode);
+    const setCanvasMode = useStore(state => state.setCanvasMode);
+    const dataTable = useStore(state => state.dataTable);
+    const setMultiSelect = useStore(state => state.setMultiSelect);
+    const [startPt, setStartPt] = useState(null);
+    const [currPt, setCurrPt] = useState(null);
+
+    const isActive = canvasMode === 'MARQUEE_SELECT' || canvasMode === 'MARQUEE_ZOOM';
+    if (!isActive) return null;
+
+    const handlePointerDown = (e) => {
+        e.stopPropagation();
+        setStartPt(e.point.clone());
+        setCurrPt(e.point.clone());
+        e.target.setPointerCapture(e.pointerId);
+    };
+
+    const handlePointerMove = (e) => {
+        if (!startPt) return;
+        setCurrPt(e.point.clone());
+    };
+
+    const handlePointerUp = (e) => {
+        if (!startPt || !currPt) return;
+        e.stopPropagation();
+        e.target.releasePointerCapture(e.pointerId);
+
+        // Compute Bounding Box
+        const minX = Math.min(startPt.x, currPt.x);
+        const maxX = Math.max(startPt.x, currPt.x);
+        const minY = Math.min(startPt.y, currPt.y) - 5000; // expand Y broadly since dragging in top-down view is usually X/Z
+        const maxY = Math.max(startPt.y, currPt.y) + 5000;
+        const minZ = Math.min(startPt.z, currPt.z);
+        const maxZ = Math.max(startPt.z, currPt.z);
+        const box = new THREE.Box3(new THREE.Vector3(minX, minY, minZ), new THREE.Vector3(maxX, maxY, maxZ));
+
+        // Find intersecting elements
+        const selected = [];
+        dataTable.forEach(el => {
+            if (useStore.getState().hiddenElementIds.includes(el._rowIndex)) return;
+
+            let pts = [];
+            if (el.ep1) pts.push(new THREE.Vector3(el.ep1.x, el.ep1.y, el.ep1.z));
+            if (el.ep2) pts.push(new THREE.Vector3(el.ep2.x, el.ep2.y, el.ep2.z));
+
+            // If dragging Right-to-Left (Crossing):
+            // We just need any point inside box (simplification, real crossing tests segment intersection).
+            const isCrossing = currPt.x < startPt.x;
+
+            let allInside = pts.length > 0;
+            let anyInside = false;
+
+            pts.forEach(pt => {
+                const inside = box.containsPoint(pt);
+                if (!inside) allInside = false;
+                if (inside) anyInside = true;
+            });
+
+            if ((isCrossing && anyInside) || (!isCrossing && allInside)) {
+                selected.push(el);
+            }
+        });
+
+        if (canvasMode === 'MARQUEE_SELECT') {
+            setMultiSelect(selected.map(e => e._rowIndex));
+        } else if (canvasMode === 'MARQUEE_ZOOM' && selected.length > 0) {
+            window.dispatchEvent(new CustomEvent('canvas-auto-center', { detail: { elements: selected } }));
+        }
+
+        setStartPt(null);
+        setCurrPt(null);
+        setCanvasMode('VIEW');
+    };
+
+    return (
+        <group>
+            {/* Transparent click plane positioned up slightly to avoid z-fighting */}
+            <mesh
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                rotation={[-Math.PI / 2, 0, 0]}
+                position={[0, Math.max(startPt?.y || 0, 0) + 1, 0]}
+            >
+                <planeGeometry args={[500000, 500000]} />
+                <meshBasicMaterial transparent opacity={0} depthTest={false} />
+            </mesh>
+
+            {/* Marquee Visuals */}
+            {startPt && currPt && (
+                <Line
+                    points={[
+                        new THREE.Vector3(startPt.x, startPt.y, startPt.z),
+                        new THREE.Vector3(currPt.x, startPt.y, startPt.z),
+                        new THREE.Vector3(currPt.x, startPt.y, currPt.z),
+                        new THREE.Vector3(startPt.x, startPt.y, currPt.z),
+                        new THREE.Vector3(startPt.x, startPt.y, startPt.z),
+                    ]}
+                    color={currPt.x < startPt.x ? "#10b981" : "#3b82f6"} // Green for crossing, Blue for window
+                    lineWidth={3}
+                    depthTest={false}
+                />
+            )}
+        </group>
+    );
+};
+
+// ----------------------------------------------------
 // Measure Tool
 // ----------------------------------------------------
 const MeasureTool = () => {
     const measurePts = useStore(state => state.measurePts);
     const addMeasurePt = useStore(state => state.addMeasurePt);
     const canvasMode = useStore(state => state.canvasMode);
+    const cursorSnapPoint = useStore(state => state.cursorSnapPoint);
 
     if (canvasMode !== 'MEASURE') return null;
 
     const handlePointerDown = (e) => {
         e.stopPropagation();
-        addMeasurePt(e.point.clone());
+        addMeasurePt(cursorSnapPoint ? cursorSnapPoint.clone() : e.point.clone());
     };
 
     return (
@@ -787,6 +1091,8 @@ const BreakPipeLayer = () => {
         }
     };
 
+    const cursorSnapPoint = useStore(state => state.cursorSnapPoint);
+
     const handlePointerDown = (e, pipeRow) => {
         e.stopPropagation();
 
@@ -795,7 +1101,8 @@ const BreakPipeLayer = () => {
 
             pushHistory('Break Pipe');
 
-            const breakResults = breakPipeAtPoint(pipeRow, e.point);
+            const breakPt = cursorSnapPoint ? cursorSnapPoint.clone() : e.point.clone();
+            const breakResults = breakPipeAtPoint(pipeRow, breakPt);
 
             if (breakResults) {
                 const [rowA, rowB] = breakResults;
@@ -813,7 +1120,7 @@ const BreakPipeLayer = () => {
 
                 useStore.getState().setDataTable(updatedTable);
 
-                dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Applied/Fix", message: `Row ${pipeRow._rowIndex} broken at (${e.point.x.toFixed(1)}, ${e.point.y.toFixed(1)}, ${e.point.z.toFixed(1)}).` } });
+                dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Applied/Fix", message: `Row ${pipeRow._rowIndex} broken at (${breakPt.x.toFixed(1)}, ${breakPt.y.toFixed(1)}, ${breakPt.z.toFixed(1)}).` } });
 
                 // One-shot action
                 useStore.getState().setCanvasMode('VIEW');
@@ -830,7 +1137,7 @@ const BreakPipeLayer = () => {
                  but they are already rendered. We can render a transparent overlay of pipes here.
              */}
              <group onPointerMove={handlePointerMove}>
-                {dataTable.filter(r => (r.type||'').toUpperCase() === 'PIPE').map((pipe, i) => {
+                {dataTable.filter(r => (r.type||'').toUpperCase() === 'PIPE' && !useStore.getState().hiddenElementIds.includes(r._rowIndex)).map((pipe, i) => {
                     if (!pipe.ep1 || !pipe.ep2) return null;
                     const v1 = new THREE.Vector3(pipe.ep1.x, pipe.ep1.y, pipe.ep1.z);
                     const v2 = new THREE.Vector3(pipe.ep2.x, pipe.ep2.y, pipe.ep2.z);
@@ -864,111 +1171,172 @@ const BreakPipeLayer = () => {
 // ----------------------------------------------------
 const EndpointSnapLayer = () => {
     const canvasMode = useStore(state => state.canvasMode);
+    const setCanvasMode = useStore(state => state.setCanvasMode);
     const dataTable = useStore(state => state.dataTable);
+    const updateDataTable = useStore(state => state.updateDataTable);
     const pushHistory = useStore(state => state.pushHistory);
     const { dispatch } = useAppContext();
-    const { camera } = useThree();
 
-    const [draft, setDraft] = useState(null);
-    const [cursorPos, setCursorPos] = useState(null);
-    const [hoveredEP, setHoveredEP] = useState(null);
+    const [connectDraft, setConnectDraft] = useState(null);
+    const [cursorPos, setCursorPos] = useState(new THREE.Vector3());
 
+    // Only active in CONNECT mode
     if (canvasMode !== 'CONNECT') return null;
 
     const snapRadius = 50; // mm
 
     const handlePointerMove = (e) => {
-        setCursorPos(e.point);
+        let pt = e.point.clone();
 
+        if (connectDraft && useStore.getState().orthoMode) {
+            const rawDelta = pt.clone().sub(connectDraft.fromPosition);
+            const absX = Math.abs(rawDelta.x);
+            const absY = Math.abs(rawDelta.y);
+            const absZ = Math.abs(rawDelta.z);
+            if (absX >= absY && absX >= absZ) { rawDelta.y = 0; rawDelta.z = 0; }
+            else if (absY >= absX && absY >= absZ) { rawDelta.x = 0; rawDelta.z = 0; }
+            else { rawDelta.x = 0; rawDelta.y = 0; }
+            pt = connectDraft.fromPosition.clone().add(rawDelta);
+        }
+
+        setCursorPos(pt);
         let nearest = null;
         let minDist = snapRadius;
 
-        dataTable.forEach(row => {
+        dataTable.forEach((row) => {
             ['ep1', 'ep2'].forEach(epKey => {
-                if (row[epKey]) {
-                    const pt = new THREE.Vector3(row[epKey].x, row[epKey].y, row[epKey].z);
-                    const dist = pt.distanceTo(e.point);
-                    if (dist < minDist) {
-                        minDist = dist;
+                const ep = row[epKey];
+                if (ep) {
+                    const pt = new THREE.Vector3(parseFloat(ep.x), parseFloat(ep.y), parseFloat(ep.z));
+                    const d = pt.distanceTo(e.point);
+                    if (d < minDist) {
+                        minDist = d;
                         nearest = { row, epKey, position: pt };
                     }
                 }
             });
         });
 
-        setHoveredEP(nearest);
+        // We already use useStore(cursorSnapPoint) globally but here we need
+        // to manage click/drag specifically for stretching endpoints.
+        // We'll rely on the global snap point for visuals, but we handle the dragging here.
     };
 
     const handlePointerDown = (e) => {
         e.stopPropagation();
-        if (hoveredEP) {
-            setDraft({
-                fromElement: hoveredEP.row,
-                fromEPKey: hoveredEP.epKey,
-                fromPosition: hoveredEP.position
+        let nearest = null;
+        let minDist = snapRadius;
+
+        dataTable.forEach((row) => {
+            ['ep1', 'ep2'].forEach(epKey => {
+                const ep = row[epKey];
+                if (ep) {
+                    const pt = new THREE.Vector3(parseFloat(ep.x), parseFloat(ep.y), parseFloat(ep.z));
+                    const d = pt.distanceTo(e.point);
+                    if (d < minDist) {
+                        minDist = d;
+                        nearest = { rowIndex: row._rowIndex, epKey, position: pt };
+                    }
+                }
             });
+        });
+
+        if (nearest) {
+            setConnectDraft({ fromRowIndex: nearest.rowIndex, fromEP: nearest.epKey, fromPosition: nearest.position });
         }
     };
 
     const handlePointerUp = (e) => {
-        if (draft && hoveredEP && draft.fromElement._rowIndex !== hoveredEP.row._rowIndex) {
-            // Commit Snap
+        if (!connectDraft) return;
+        e.stopPropagation();
+
+        let nearest = null;
+        let minDist = snapRadius;
+
+        dataTable.forEach((row) => {
+            ['ep1', 'ep2'].forEach(epKey => {
+                const ep = row[epKey];
+                if (ep) {
+                    const pt = new THREE.Vector3(parseFloat(ep.x), parseFloat(ep.y), parseFloat(ep.z));
+                    const d = pt.distanceTo(e.point);
+                    if (d < minDist) {
+                        minDist = d;
+                        nearest = { rowIndex: row._rowIndex, epKey, position: pt };
+                    }
+                }
+            });
+        });
+
+        // If dropped on another valid snap point
+        if (nearest && (nearest.rowIndex !== connectDraft.fromRowIndex || nearest.epKey !== connectDraft.fromEP)) {
             pushHistory('Snap Connect');
 
-            const delta = hoveredEP.position.clone().sub(draft.fromPosition);
+            const sourceRow = dataTable.find(r => r._rowIndex === connectDraft.fromRowIndex);
+            if (sourceRow) {
+                const newRow = {
+                    ...sourceRow,
+                    [connectDraft.fromEP]: { x: nearest.position.x, y: nearest.position.y, z: nearest.position.z }
+                };
 
-            const coords = { [draft.fromEPKey]: { x: hoveredEP.position.x, y: hoveredEP.position.y, z: hoveredEP.position.z } };
+                // Fast local update
+                updateDataTable([newRow]);
 
-            dispatch({
-                type: 'UPDATE_STAGE2_ROW_COORDS',
-                payload: { rowIndex: draft.fromElement._rowIndex, coords }
-            });
+                // Slow global update
+                dispatch({
+                    type: 'BATCH_UPDATE_SUPPORT_ATTRS', // Using existing batch case for arbitrary updates
+                    payload: { rowIndices: [sourceRow._rowIndex], attrs: { [connectDraft.fromEP]: newRow[connectDraft.fromEP] } }
+                });
 
-            const updatedTable = dataTable.map(r =>
-                r._rowIndex === draft.fromElement._rowIndex ? { ...r, ...coords } : r
-            );
-            useStore.getState().setDataTable(updatedTable);
-
-            dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Applied/Fix", message: `Snapped Row ${draft.fromElement._rowIndex} ${draft.fromEPKey} to Row ${hoveredEP.row._rowIndex} ${hoveredEP.epKey}.` } });
+                dispatch({
+                    type: 'ADD_LOG',
+                    payload: { type: 'Applied/Fix', stage: 'CONNECT_TOOL', message: `Stretched Row ${sourceRow._rowIndex} ${connectDraft.fromEP} to Row ${nearest.rowIndex} ${nearest.epKey}.` }
+                });
+            }
         }
-        setDraft(null);
+
+        setConnectDraft(null);
+        setCanvasMode('VIEW');
     };
 
     return (
-        <group onPointerMove={handlePointerMove} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp}>
-            {/* Click plane for move/up events when off geometry */}
-            <mesh>
-                <planeGeometry args={[200000, 200000]} />
-                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        <group>
+            {/* Transparent capture plane for CONNECT mode */}
+            <mesh
+                visible={false}
+                scale={100000}
+                rotation={[-Math.PI / 2, 0, 0]}
+                onPointerMove={handlePointerMove}
+                onPointerDown={handlePointerDown}
+                onPointerUp={handlePointerUp}
+            >
+                <planeGeometry />
+                <meshBasicMaterial transparent opacity={0} depthTest={false} />
             </mesh>
 
-            {/* Snap Targets */}
-            {dataTable.map((row, i) => (
-                <React.Fragment key={`snap-${i}`}>
-                    {row.ep1 && (
-                        <mesh position={[row.ep1.x, row.ep1.y, row.ep1.z]}>
-                            <sphereGeometry args={[20, 8, 8]} />
-                            <meshBasicMaterial color="#eab308" transparent opacity={0.6} />
-                        </mesh>
-                    )}
-                    {row.ep2 && (
-                        <mesh position={[row.ep2.x, row.ep2.y, row.ep2.z]}>
-                            <sphereGeometry args={[20, 8, 8]} />
-                            <meshBasicMaterial color="#eab308" transparent opacity={0.6} />
-                        </mesh>
-                    )}
-                </React.Fragment>
-            ))}
+            {/* Draw snap targets on every EP */}
+            {dataTable.map(row => {
+                const pts = [];
+                if (row.ep1) pts.push(new THREE.Vector3(parseFloat(row.ep1.x), parseFloat(row.ep1.y), parseFloat(row.ep1.z)));
+                if (row.ep2) pts.push(new THREE.Vector3(parseFloat(row.ep2.x), parseFloat(row.ep2.y), parseFloat(row.ep2.z)));
+                return pts.map((pt, i) => (
+                    <mesh key={`snap-${row._rowIndex}-${i}`} position={pt} renderOrder={999}>
+                        <sphereGeometry args={[20, 16, 16]} />
+                        <meshBasicMaterial color="#eab308" transparent opacity={0.5} depthTest={false} />
+                    </mesh>
+                ));
+            })}
 
-            {hoveredEP && (
-                <mesh position={hoveredEP.position}>
-                    <sphereGeometry args={[25, 16, 16]} />
-                    <meshBasicMaterial color="#ffffff" wireframe />
-                </mesh>
-            )}
-
-            {draft && cursorPos && (
-                <Line points={[draft.fromPosition, cursorPos]} color="#eab308" lineWidth={3} dashed dashSize={20} gapSize={10} />
+            {/* Draw active connection line */}
+            {connectDraft && (
+                <Line
+                    points={[connectDraft.fromPosition, cursorPos]}
+                    color="#eab308"
+                    lineWidth={3}
+                    dashed
+                    dashSize={20}
+                    gapSize={10}
+                    depthTest={false}
+                />
             )}
         </group>
     );
@@ -1072,6 +1440,8 @@ const InsertSupportLayer = () => {
         if (e.point) setHoverPos(e.point);
     };
 
+    const cursorSnapPoint = useStore(state => state.cursorSnapPoint);
+
     const handlePointerDown = (e, pipeRow) => {
         e.stopPropagation();
 
@@ -1079,7 +1449,8 @@ const InsertSupportLayer = () => {
 
             pushHistory('Insert Support');
 
-            const supportRow = insertSupportAtPipe(pipeRow, e.point);
+            const insertPt = cursorSnapPoint ? cursorSnapPoint.clone() : e.point.clone();
+            const supportRow = insertSupportAtPipe(pipeRow, insertPt);
 
             if (supportRow) {
                 // Determine new index and update
@@ -1237,15 +1608,17 @@ const ControlsAutoCenter = ({ externalRef }) => {
             isAnimating.current = true;
         };
 
-        const handleCenter = () => {
+        const handleCenter = (e) => {
             const pipes = getPipes();
             if (pipes.length === 0 || !controlsRef.current) return;
 
-            // Calculate bounding box of all pipes
             let minX = Infinity, minY = Infinity, minZ = Infinity;
             let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
 
-            pipes.forEach(p => {
+            // Optional explicit list of elements to frame
+            const elsToFrame = e?.detail?.elements || pipes;
+
+            elsToFrame.forEach(p => {
                 if (p.ep1) {
                     minX = Math.min(minX, p.ep1.x); minY = Math.min(minY, p.ep1.y); minZ = Math.min(minZ, p.ep1.z);
                     maxX = Math.max(maxX, p.ep1.x); maxY = Math.max(maxY, p.ep1.y); maxZ = Math.max(maxZ, p.ep1.z);
@@ -1328,6 +1701,8 @@ export function CanvasTab() {
   const setShowGapRadar = useStore(state => state.setShowGapRadar);
   const showEPLabels = useStore(state => state.showEPLabels);
   const setShowEPLabels = useStore(state => state.setShowEPLabels);
+  const colorMode = useStore(state => state.colorMode);
+  const setColorMode = useStore(state => state.setColorMode);
   const dragAxisLock = useStore(state => state.dragAxisLock);
   const setDragAxisLock = useStore(state => state.setDragAxisLock);
   const undo = useStore(state => state.undo);
@@ -1372,6 +1747,7 @@ export function CanvasTab() {
               case 'x': setDragAxisLock('X'); break;
               case 'y': setDragAxisLock('Y'); break;
               case 'z': setDragAxisLock('Z'); break;
+              case 'o': useStore.getState().toggleOrthoMode(); break;
               case 'f':
                   if (useStore.getState().selectedElementId) {
                       const el = dataTable.find(r => r._rowIndex === useStore.getState().selectedElementId);
@@ -1399,6 +1775,18 @@ export function CanvasTab() {
                           dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Applied/Fix", message: `Deleted Row ${selId} via keyboard.` } });
                       }
                   }
+                  break;
+              case 'h':
+                  if (e.shiftKey) {
+                      useStore.getState().isolateSelected();
+                  } else if (e.altKey) {
+                      useStore.getState().unhideAll();
+                  } else {
+                      useStore.getState().hideSelected();
+                  }
+                  break;
+              case 'u':
+                  useStore.getState().unhideAll();
                   break;
               default:
                   // Ctrl+Z
@@ -1569,10 +1957,31 @@ export function CanvasTab() {
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
                 </button>
+                <button
+                    onClick={() => setCanvasMode(canvasMode === 'MARQUEE_SELECT' ? 'VIEW' : 'MARQUEE_SELECT')}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'MARQUEE_SELECT' ? 'bg-blue-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                    title="Marquee Select Mode"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeDasharray="4 4" /></svg>
+                </button>
+                <button
+                    onClick={() => setCanvasMode(canvasMode === 'MARQUEE_ZOOM' ? 'VIEW' : 'MARQUEE_ZOOM')}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'MARQUEE_ZOOM' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                    title="Marquee Zoom Mode"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><rect x="8" y="8" width="6" height="6" strokeDasharray="2 2"/></svg>
+                </button>
             </div>
 
             {/* Toggle Buttons (Right) */}
             <div className="flex gap-1 pl-1">
+                <button
+                    onClick={() => setColorMode(colorMode === 'TYPE' ? 'SPOOL' : 'TYPE')}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition ${colorMode === 'SPOOL' ? 'bg-purple-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                    title="Toggle Spool Colors"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </button>
                 <button
                     onClick={() => setShowGapRadar(!showGapRadar)}
                     className={`w-8 h-8 flex items-center justify-center rounded transition ${showGapRadar ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
@@ -1670,10 +2079,12 @@ export function CanvasTab() {
 
         <EndpointSnapLayer />
         <GapRadarLayer />
+        <GlobalSnapLayer />
         <MeasureTool />
         <BreakPipeLayer />
         <InsertSupportLayer />
         <EPLabelsLayer />
+        <MarqueeLayer />
 
         {(() => {
             const allIssues = [
