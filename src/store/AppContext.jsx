@@ -131,6 +131,43 @@ function reducer(state, action) {
       );
       return { ...state, stage2Data: updated };
     }
+    case "DELETE_ELEMENTS": {
+      // payload: { rowIndices: number[] }
+      const newTable = state.stage2Data.filter(r => !action.payload.rowIndices.includes(r._rowIndex));
+      const reindexed = newTable.map((r, i) => ({ ...r, _rowIndex: i + 1 }));
+      return { ...state, stage2Data: reindexed, history: [...(state.history || []), state.stage2Data] };
+    }
+    case "BREAK_PIPE": {
+      // payload: { rowIndex, rowA, rowB }
+      const newTable = state.stage2Data.flatMap(r =>
+        r._rowIndex === action.payload.rowIndex ? [action.payload.rowA, action.payload.rowB] : [r]
+      );
+      const reindexed = newTable.map((r, i) => ({ ...r, _rowIndex: i + 1 }));
+      return { ...state, stage2Data: reindexed, history: [...(state.history || []), state.stage2Data] };
+    }
+    case "INSERT_SUPPORT": {
+      // payload: { afterRowIndex, supportRow }
+      const newTable = [...state.stage2Data];
+      const idx = newTable.findIndex(r => r._rowIndex === action.payload.afterRowIndex);
+      if (idx !== -1) {
+        newTable.splice(idx + 1, 0, action.payload.supportRow);
+      } else {
+        newTable.push(action.payload.supportRow);
+      }
+      const reindexed = newTable.map((r, i) => ({ ...r, _rowIndex: i + 1 }));
+      return { ...state, stage2Data: reindexed, history: [...(state.history || []), state.stage2Data] };
+    }
+    case "BATCH_UPDATE_SUPPORT_ATTRS": {
+      // payload: { rowIndices, attrs }
+      const newTable = state.stage2Data.map(r =>
+        action.payload.rowIndices.includes(r._rowIndex) ? { ...r, ...action.payload.attrs } : r
+      );
+      return { ...state, stage2Data: newTable, history: [...(state.history || []), state.stage2Data] };
+    }
+    case "APPLY_GAP_FIX": {
+      // payload: { updatedTable }
+      return { ...state, stage2Data: action.payload.updatedTable, history: [...(state.history || []), state.stage2Data] };
+    }
     case "SET_STAGE_3_DATA":
       return { ...state, stage3Data: action.payload };
     case "SET_CONFIG":

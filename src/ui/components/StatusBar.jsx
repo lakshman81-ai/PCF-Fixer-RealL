@@ -412,8 +412,7 @@ export function StatusBar({ activeTab, activeStage }) {
     dispatch({ type: "SET_STATUS_MESSAGE", payload: msg });
   };
 
-  const d = new Date();
-  const verString = `Ver ${d.getDate().toString().padStart(2, '0')}-${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getFullYear()} (2)`;
+  const verString = "Ver 24-03-2026 (1)";
 
   const handleExecute = () => {
       setShowModal(false);

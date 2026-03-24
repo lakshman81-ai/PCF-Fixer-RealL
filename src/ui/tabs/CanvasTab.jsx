@@ -6,6 +6,11 @@ import { useStore } from '../../store/useStore';
 import { useAppContext } from '../../store/AppContext';
 import { applyFixes } from '../../engine/FixApplicator';
 import { createLogger } from '../../utils/Logger';
+import { fix6mmGaps, fix25mmGapsWithPipe, breakPipeAtPoint, insertSupportAtPipe } from '../../engine/GapFixEngine';
+import { SideInspector } from '../components/SideInspector';
+import { LogDrawer } from '../components/LogDrawer';
+import { SceneHealthHUD } from '../components/SceneHealthHUD';
+import { SupportPropertyPanel } from '../components/SupportPropertyPanel';
 
 // ----------------------------------------------------
 // Colour & geometry helpers per component type
@@ -245,6 +250,7 @@ const DraggableComponents = ({ snapResolution, onDragCommit, orbitRef }) => {
 
   const [dragState, setDragState] = useState(null);
   const dragPlane = useMemo(() => new THREE.Plane(), []);
+  const dragAxisLock = useStore(state => state.dragAxisLock);
   const ray = useMemo(() => new THREE.Ray(), []);
 
   const snapV = useCallback((v) => Math.round(v / snapResolution) * snapResolution, [snapResolution]);
@@ -279,9 +285,15 @@ const DraggableComponents = ({ snapResolution, onDragCommit, orbitRef }) => {
     const intersect = new THREE.Vector3();
     if (!ray.intersectPlane(dragPlane, intersect)) return;
     const rawDelta = intersect.clone().sub(dragState.hitPoint);
+
+    // Axis Lock Logic
+    if (dragAxisLock === 'X') { rawDelta.y = 0; rawDelta.z = 0; }
+    if (dragAxisLock === 'Y') { rawDelta.x = 0; rawDelta.z = 0; }
+    if (dragAxisLock === 'Z') { rawDelta.x = 0; rawDelta.y = 0; }
+
     const snapped = new THREE.Vector3(snapV(rawDelta.x), snapV(rawDelta.y), snapV(rawDelta.z));
     setDragState(prev => prev ? { ...prev, delta: snapped } : null);
-  }, [dragState, camera, gl, dragPlane, ray, snapV]);
+  }, [dragState, camera, gl, dragPlane, ray, snapV, dragAxisLock]);
 
   const handlePointerUp = useCallback((e) => {
     if (!dragState) return;
@@ -300,8 +312,22 @@ const DraggableComponents = ({ snapResolution, onDragCommit, orbitRef }) => {
 
   if (elements.length === 0) return null;
 
+  const dragOrigin = dragState?.original?.ep1 ? new THREE.Vector3(dragState.original.ep1.x, dragState.original.ep1.y, dragState.original.ep1.z) : new THREE.Vector3();
+
   return (
     <group onPointerMove={handlePointerMove} onPointerUp={handlePointerUp}>
+      {/* Axis Lock Guide Line */}
+      {dragState && dragAxisLock && (
+        <Line
+          points={[
+            new THREE.Vector3().copy(dragOrigin).add(new THREE.Vector3(dragAxisLock==='X'?-10000:0, dragAxisLock==='Y'?-10000:0, dragAxisLock==='Z'?-10000:0)),
+            new THREE.Vector3().copy(dragOrigin).add(new THREE.Vector3(dragAxisLock==='X'?10000:0, dragAxisLock==='Y'?10000:0, dragAxisLock==='Z'?10000:0))
+          ]}
+          color={dragAxisLock === 'X' ? 'red' : dragAxisLock === 'Y' ? 'green' : 'blue'}
+          lineWidth={2}
+          dashed
+        />
+      )}
       {elements.map((el) => {
         const isDragging = dragState?.rowIndex === el._rowIndex;
         const dx = isDragging ? dragState.delta.x : 0;
@@ -676,6 +702,493 @@ const SingleIssuePanel = ({ proposals, validationIssues, currentIssueIndex, setC
     );
 };
 
+// ----------------------------------------------------
+// Measure Tool
+// ----------------------------------------------------
+const MeasureTool = () => {
+    const measurePts = useStore(state => state.measurePts);
+    const addMeasurePt = useStore(state => state.addMeasurePt);
+    const canvasMode = useStore(state => state.canvasMode);
+
+    if (canvasMode !== 'MEASURE') return null;
+
+    const handlePointerDown = (e) => {
+        e.stopPropagation();
+        addMeasurePt(e.point.clone());
+    };
+
+    return (
+        <group>
+            {/* Click Plane */}
+            <mesh onPointerDown={handlePointerDown}>
+                <planeGeometry args={[200000, 200000]} />
+                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            </mesh>
+
+            {measurePts.length >= 1 && (
+                <mesh position={measurePts[0]}>
+                    <sphereGeometry args={[20, 16, 16]} />
+                    <meshBasicMaterial color="#eab308" />
+                </mesh>
+            )}
+
+            {measurePts.length === 2 && (
+                <>
+                    <mesh position={measurePts[1]}>
+                        <sphereGeometry args={[20, 16, 16]} />
+                        <meshBasicMaterial color="#eab308" />
+                    </mesh>
+                    <Line points={[measurePts[0], measurePts[1]]} color="#eab308" lineWidth={3} />
+
+                    {(() => {
+                        const mid = measurePts[0].clone().lerp(measurePts[1], 0.5);
+                        const dist = measurePts[0].distanceTo(measurePts[1]);
+                        const dx = Math.abs(measurePts[0].x - measurePts[1].x);
+                        const dy = Math.abs(measurePts[0].y - measurePts[1].y);
+                        const dz = Math.abs(measurePts[0].z - measurePts[1].z);
+                        return (
+                            <group position={mid}>
+                                <mesh position={[0, 0, 0]}>
+                                    <planeGeometry args={[300, 120]} />
+                                    <meshBasicMaterial color="#1e293b" side={THREE.DoubleSide} opacity={0.8} transparent />
+                                </mesh>
+                                <Text position={[0, 25, 1]} color="#eab308" fontSize={25} anchorX="center" anchorY="middle" outlineWidth={1} outlineColor="#0f172a">
+                                    Dist: {dist.toFixed(1)}mm
+                                </Text>
+                                <Text position={[0, -10, 1]} color="#cbd5e1" fontSize={15} anchorX="center" anchorY="middle" outlineWidth={1} outlineColor="#0f172a">
+                                    X:{dx.toFixed(1)} Y:{dy.toFixed(1)} Z:{dz.toFixed(1)}
+                                </Text>
+                            </group>
+                        );
+                    })()}
+                </>
+            )}
+        </group>
+    );
+};
+
+// ----------------------------------------------------
+// Break Pipe Layer
+// ----------------------------------------------------
+const BreakPipeLayer = () => {
+    const canvasMode = useStore(state => state.canvasMode);
+    const dataTable = useStore(state => state.dataTable);
+    const { dispatch } = useAppContext();
+    const pushHistory = useStore(state => state.pushHistory);
+
+    const [hoverPos, setHoverPos] = useState(null);
+
+    if (canvasMode !== 'BREAK') return null;
+
+    const handlePointerMove = (e) => {
+        // e.object is the instanceMesh, but we need world point
+        if (e.point) {
+            setHoverPos(e.point);
+        }
+    };
+
+    const handlePointerDown = (e, pipeRow) => {
+        e.stopPropagation();
+
+        // Ensure it's a pipe
+        if (pipeRow) {
+
+            pushHistory('Break Pipe');
+
+            const breakResults = breakPipeAtPoint(pipeRow, e.point);
+
+            if (breakResults) {
+                const [rowA, rowB] = breakResults;
+
+                // Dispatch to AppContext
+                dispatch({
+                    type: 'BREAK_PIPE',
+                    payload: { rowIndex: pipeRow._rowIndex, rowA, rowB }
+                });
+
+                // Mirror to Zustand
+                const updatedTable = dataTable.flatMap(r =>
+                    r._rowIndex === pipeRow._rowIndex ? [rowA, rowB] : [r]
+                ).map((r, i) => ({ ...r, _rowIndex: i + 1 })); // Re-index
+
+                useStore.getState().setDataTable(updatedTable);
+
+                dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Applied/Fix", message: `Row ${pipeRow._rowIndex} broken at (${e.point.x.toFixed(1)}, ${e.point.y.toFixed(1)}, ${e.point.z.toFixed(1)}).` } });
+
+                // One-shot action
+                useStore.getState().setCanvasMode('VIEW');
+            } else {
+                dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Error", message: `Cannot break pipe Row ${pipeRow._rowIndex}. Segment too short.` } });
+            }
+        }
+    };
+
+    return (
+        <group>
+             {/* Invisible plane/mesh intercepts down events?
+                 Actually we attach events to the InstancedPipes via the group if we could,
+                 but they are already rendered. We can render a transparent overlay of pipes here.
+             */}
+             <group onPointerMove={handlePointerMove}>
+                {dataTable.filter(r => (r.type||'').toUpperCase() === 'PIPE').map((pipe, i) => {
+                    if (!pipe.ep1 || !pipe.ep2) return null;
+                    const v1 = new THREE.Vector3(pipe.ep1.x, pipe.ep1.y, pipe.ep1.z);
+                    const v2 = new THREE.Vector3(pipe.ep2.x, pipe.ep2.y, pipe.ep2.z);
+                    const mid = v1.clone().lerp(v2, 0.5);
+                    const dist = v1.distanceTo(v2);
+                    if (dist === 0) return null;
+                    const dir = v2.clone().sub(v1).normalize();
+                    const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
+                    const r = pipe.bore ? pipe.bore / 2 : 5;
+                    return (
+                        <mesh key={`bp-${i}`} position={mid} quaternion={quat} onPointerDown={(e) => handlePointerDown(e, pipe)}>
+                            <cylinderGeometry args={[r*1.5, r*1.5, dist, 8]} />
+                            <meshBasicMaterial color="red" transparent opacity={0} depthWrite={false} />
+                        </mesh>
+                    );
+                })}
+             </group>
+
+             {hoverPos && (
+                 <mesh position={hoverPos}>
+                     <sphereGeometry args={[20, 16, 16]} />
+                     <meshBasicMaterial color="red" wireframe />
+                 </mesh>
+             )}
+        </group>
+    );
+};
+
+// ----------------------------------------------------
+// Endpoint Snap Layer
+// ----------------------------------------------------
+const EndpointSnapLayer = () => {
+    const canvasMode = useStore(state => state.canvasMode);
+    const dataTable = useStore(state => state.dataTable);
+    const pushHistory = useStore(state => state.pushHistory);
+    const { dispatch } = useAppContext();
+    const { camera } = useThree();
+
+    const [draft, setDraft] = useState(null);
+    const [cursorPos, setCursorPos] = useState(null);
+    const [hoveredEP, setHoveredEP] = useState(null);
+
+    if (canvasMode !== 'CONNECT') return null;
+
+    const snapRadius = 50; // mm
+
+    const handlePointerMove = (e) => {
+        setCursorPos(e.point);
+
+        let nearest = null;
+        let minDist = snapRadius;
+
+        dataTable.forEach(row => {
+            ['ep1', 'ep2'].forEach(epKey => {
+                if (row[epKey]) {
+                    const pt = new THREE.Vector3(row[epKey].x, row[epKey].y, row[epKey].z);
+                    const dist = pt.distanceTo(e.point);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        nearest = { row, epKey, position: pt };
+                    }
+                }
+            });
+        });
+
+        setHoveredEP(nearest);
+    };
+
+    const handlePointerDown = (e) => {
+        e.stopPropagation();
+        if (hoveredEP) {
+            setDraft({
+                fromElement: hoveredEP.row,
+                fromEPKey: hoveredEP.epKey,
+                fromPosition: hoveredEP.position
+            });
+        }
+    };
+
+    const handlePointerUp = (e) => {
+        if (draft && hoveredEP && draft.fromElement._rowIndex !== hoveredEP.row._rowIndex) {
+            // Commit Snap
+            pushHistory('Snap Connect');
+
+            const delta = hoveredEP.position.clone().sub(draft.fromPosition);
+
+            const coords = { [draft.fromEPKey]: { x: hoveredEP.position.x, y: hoveredEP.position.y, z: hoveredEP.position.z } };
+
+            dispatch({
+                type: 'UPDATE_STAGE2_ROW_COORDS',
+                payload: { rowIndex: draft.fromElement._rowIndex, coords }
+            });
+
+            const updatedTable = dataTable.map(r =>
+                r._rowIndex === draft.fromElement._rowIndex ? { ...r, ...coords } : r
+            );
+            useStore.getState().setDataTable(updatedTable);
+
+            dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Applied/Fix", message: `Snapped Row ${draft.fromElement._rowIndex} ${draft.fromEPKey} to Row ${hoveredEP.row._rowIndex} ${hoveredEP.epKey}.` } });
+        }
+        setDraft(null);
+    };
+
+    return (
+        <group onPointerMove={handlePointerMove} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp}>
+            {/* Click plane for move/up events when off geometry */}
+            <mesh>
+                <planeGeometry args={[200000, 200000]} />
+                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            </mesh>
+
+            {/* Snap Targets */}
+            {dataTable.map((row, i) => (
+                <React.Fragment key={`snap-${i}`}>
+                    {row.ep1 && (
+                        <mesh position={[row.ep1.x, row.ep1.y, row.ep1.z]}>
+                            <sphereGeometry args={[20, 8, 8]} />
+                            <meshBasicMaterial color="#eab308" transparent opacity={0.6} />
+                        </mesh>
+                    )}
+                    {row.ep2 && (
+                        <mesh position={[row.ep2.x, row.ep2.y, row.ep2.z]}>
+                            <sphereGeometry args={[20, 8, 8]} />
+                            <meshBasicMaterial color="#eab308" transparent opacity={0.6} />
+                        </mesh>
+                    )}
+                </React.Fragment>
+            ))}
+
+            {hoveredEP && (
+                <mesh position={hoveredEP.position}>
+                    <sphereGeometry args={[25, 16, 16]} />
+                    <meshBasicMaterial color="#ffffff" wireframe />
+                </mesh>
+            )}
+
+            {draft && cursorPos && (
+                <Line points={[draft.fromPosition, cursorPos]} color="#eab308" lineWidth={3} dashed dashSize={20} gapSize={10} />
+            )}
+        </group>
+    );
+};
+
+// ----------------------------------------------------
+// Gap Radar Layer
+// ----------------------------------------------------
+const GapRadarLayer = () => {
+    const showGapRadar = useStore(state => state.showGapRadar);
+    const dataTable = useStore(state => state.dataTable);
+
+    const gaps = useMemo(() => {
+        if (!showGapRadar || dataTable.length === 0) return [];
+        const found = [];
+        for (let i = 0; i < dataTable.length - 1; i++) {
+            const elA = dataTable[i];
+            const elB = dataTable[i + 1];
+            if (elA.ep2 && elB.ep1) {
+                const ptA = new THREE.Vector3(elA.ep2.x, elA.ep2.y, elA.ep2.z);
+                const ptB = new THREE.Vector3(elB.ep1.x, elB.ep1.y, elB.ep1.z);
+                const dist = ptA.distanceTo(ptB);
+                if (dist > 0 && dist <= 25.0) {
+                    found.push({ ptA, ptB, dist, mid: ptA.clone().lerp(ptB, 0.5) });
+                }
+            }
+        }
+        return found;
+    }, [showGapRadar, dataTable]);
+
+    if (!showGapRadar || gaps.length === 0) return null;
+
+    return (
+        <group>
+            {gaps.map((gap, i) => {
+                const color = gap.dist <= 6.0 ? '#f97316' : '#ef4444'; // Orange for fixable, Red for insert pipe
+                return (
+                    <group key={`gap-${i}`}>
+                        <Line points={[gap.ptA, gap.ptB]} color={color} lineWidth={4} dashed dashSize={5} gapSize={2} />
+                        <Text position={[gap.mid.x, gap.mid.y + 15, gap.mid.z]} color={color} fontSize={15} anchorX="center" outlineWidth={1} outlineColor="#000">
+                            {gap.dist.toFixed(1)}mm
+                        </Text>
+                    </group>
+                );
+            })}
+        </group>
+    );
+};
+
+// ----------------------------------------------------
+// EP Labels
+// ----------------------------------------------------
+const EPLabelsLayer = () => {
+    const showEPLabels = useStore(state => state.showEPLabels);
+    const dataTable = useStore(state => state.dataTable);
+    const { dispatch } = useAppContext();
+
+    useEffect(() => {
+        if (showEPLabels && dataTable.length > 300) {
+            dispatch({ type: "ADD_LOG", payload: { stage: "UI", type: "Warning", message: "EP Labels disabled: >300 elements causes performance issues." } });
+            useStore.getState().setShowEPLabels(false);
+        }
+    }, [showEPLabels, dataTable.length, dispatch]);
+
+    if (!showEPLabels || dataTable.length > 300) return null;
+
+    return (
+        <group>
+            {dataTable.map((el, i) => (
+                <React.Fragment key={`eplabels-${i}`}>
+                    {el.ep1 && (
+                        <Text position={[el.ep1.x, el.ep1.y + 30, el.ep1.z]} color="#94a3b8" fontSize={16} outlineWidth={1} outlineColor="#000">
+                            EP1:({el.ep1.x.toFixed(0)}, {el.ep1.y.toFixed(0)}, {el.ep1.z.toFixed(0)})
+                        </Text>
+                    )}
+                    {el.ep2 && (
+                        <Text position={[el.ep2.x, el.ep2.y + 30, el.ep2.z]} color="#94a3b8" fontSize={16} outlineWidth={1} outlineColor="#000">
+                            EP2:({el.ep2.x.toFixed(0)}, {el.ep2.y.toFixed(0)}, {el.ep2.z.toFixed(0)})
+                        </Text>
+                    )}
+                </React.Fragment>
+            ))}
+        </group>
+    );
+};
+
+// ----------------------------------------------------
+// Insert Support Layer
+// ----------------------------------------------------
+const InsertSupportLayer = () => {
+    const canvasMode = useStore(state => state.canvasMode);
+    const dataTable = useStore(state => state.dataTable);
+    const { dispatch } = useAppContext();
+    const pushHistory = useStore(state => state.pushHistory);
+
+    const [hoverPos, setHoverPos] = useState(null);
+
+    if (canvasMode !== 'INSERT_SUPPORT') return null;
+
+    const handlePointerMove = (e) => {
+        if (e.point) setHoverPos(e.point);
+    };
+
+    const handlePointerDown = (e, pipeRow) => {
+        e.stopPropagation();
+
+        if (pipeRow) {
+
+            pushHistory('Insert Support');
+
+            const supportRow = insertSupportAtPipe(pipeRow, e.point);
+
+            if (supportRow) {
+                // Determine new index and update
+                const newRowIndex = Math.max(...dataTable.map(r => r._rowIndex || 0)) + 1;
+                supportRow._rowIndex = newRowIndex;
+
+                dispatch({
+                    type: 'INSERT_SUPPORT',
+                    payload: { afterRowIndex: pipeRow._rowIndex, supportRow }
+                });
+
+                // Add right after the pipe
+                const idx = dataTable.findIndex(r => r._rowIndex === pipeRow._rowIndex);
+                const updatedTable = [...dataTable];
+                updatedTable.splice(idx + 1, 0, supportRow);
+                const reindexedTable = updatedTable.map((r, i) => ({ ...r, _rowIndex: i + 1 }));
+
+                useStore.getState().setDataTable(reindexedTable);
+
+                dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Applied/Fix", message: `Inserted Support at Row ${supportRow._rowIndex}.` } });
+
+                // Keep mode active to insert more, or return to VIEW?
+                // The requirements say one-shot for break, let's keep it for insert or make it one-shot.
+                // Assuming continuous insertion is helpful.
+            }
+        }
+    };
+
+    return (
+        <group>
+             <group onPointerMove={handlePointerMove}>
+                {dataTable.filter(r => (r.type||'').toUpperCase() === 'PIPE').map((pipe, i) => {
+                    if (!pipe.ep1 || !pipe.ep2) return null;
+                    const v1 = new THREE.Vector3(pipe.ep1.x, pipe.ep1.y, pipe.ep1.z);
+                    const v2 = new THREE.Vector3(pipe.ep2.x, pipe.ep2.y, pipe.ep2.z);
+                    const mid = v1.clone().lerp(v2, 0.5);
+                    const dist = v1.distanceTo(v2);
+                    if (dist === 0) return null;
+                    const dir = v2.clone().sub(v1).normalize();
+                    const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
+                    const r = pipe.bore ? pipe.bore / 2 : 5;
+                    return (
+                        <mesh key={`is-${i}`} position={mid} quaternion={quat} onPointerDown={(e) => handlePointerDown(e, pipe)}>
+                            <cylinderGeometry args={[r*2, r*2, dist, 8]} />
+                            <meshBasicMaterial color="green" transparent opacity={0} depthWrite={false} />
+                        </mesh>
+                    );
+                })}
+             </group>
+
+             {hoverPos && (
+                 <mesh position={hoverPos}>
+                     <sphereGeometry args={[20, 16, 16]} />
+                     <meshBasicMaterial color="green" wireframe />
+                 </mesh>
+             )}
+        </group>
+    );
+};
+
+// ----------------------------------------------------
+// Hover Tooltip
+// ----------------------------------------------------
+const HoverTooltip = () => {
+    const hoveredElementId = useStore(state => state.hoveredElementId);
+    const dataTable = useStore(state => state.dataTable);
+    const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+    const timerRef = useRef(null);
+
+    // Global listener for pointer move to track cursor
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            setTooltipPos({ x: e.clientX, y: e.clientY });
+        };
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => window.removeEventListener('mousemove', handleMouseMove);
+    }, []);
+
+    if (!hoveredElementId) return null;
+
+    const el = dataTable.find(r => r._rowIndex === hoveredElementId);
+    if (!el) return null;
+
+    let len = 0;
+    if (el.ep1 && el.ep2) {
+        len = Math.sqrt(Math.pow(el.ep1.x - el.ep2.x, 2) + Math.pow(el.ep1.y - el.ep2.y, 2) + Math.pow(el.ep1.z - el.ep2.z, 2));
+    }
+
+    return (
+        <div
+            className="fixed z-50 pointer-events-none bg-slate-900/90 border border-slate-700 shadow-xl rounded p-2 text-xs"
+            style={{ left: tooltipPos.x + 15, top: tooltipPos.y + 15 }}
+        >
+            <div className="flex items-center gap-2 mb-1">
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase" style={{ backgroundColor: typeColor(el.type), color: 'white' }}>{el.type}</span>
+                <span className="text-slate-300 font-bold">Row {el._rowIndex}</span>
+            </div>
+            <div className="text-slate-400 grid grid-cols-2 gap-x-3 gap-y-1">
+                <span>Bore:</span><span className="text-slate-200">{el.bore}</span>
+                <span>Len:</span><span className="text-slate-200">{len.toFixed(1)}mm</span>
+                {el.ep1 && <><span>EP1 X:</span><span className="text-slate-200">{el.ep1.x.toFixed(1)}</span></>}
+                {el.ep1 && <><span>EP1 Y:</span><span className="text-slate-200">{el.ep1.y.toFixed(1)}</span></>}
+                {el.ep1 && <><span>EP1 Z:</span><span className="text-slate-200">{el.ep1.z.toFixed(1)}</span></>}
+            </div>
+        </div>
+    );
+};
+
+
 // Main Tab Component
 // ----------------------------------------------------
 
@@ -766,6 +1279,38 @@ const ControlsAutoCenter = ({ externalRef }) => {
         };
     }, [getPipes]);
 
+    // Session Camera Persistence
+    useEffect(() => {
+        if (!controlsRef.current) return;
+
+        try {
+            const saved = sessionStorage.getItem('pcf-canvas-session');
+            if (saved) {
+                const data = JSON.parse(saved);
+                if (data.camPos) controlsRef.current.object.position.copy(data.camPos);
+                if (data.camTarget) controlsRef.current.target.copy(data.camTarget);
+                controlsRef.current.update();
+
+                if (data.showEPLabels !== undefined) useStore.getState().setShowEPLabels(data.showEPLabels);
+                if (data.showGapRadar !== undefined) useStore.getState().setShowGapRadar(data.showGapRadar);
+            }
+        } catch (e) {
+            console.error("Failed to restore camera session", e);
+        }
+
+        return () => {
+            if (controlsRef.current) {
+                const data = {
+                    camPos: controlsRef.current.object.position,
+                    camTarget: controlsRef.current.target,
+                    showEPLabels: useStore.getState().showEPLabels,
+                    showGapRadar: useStore.getState().showGapRadar
+                };
+                sessionStorage.setItem('pcf-canvas-session', JSON.stringify(data));
+            }
+        };
+    }, []);
+
     return <OrbitControls ref={(c) => { controlsRef.current = c; if (externalRef) externalRef.current = c; }} makeDefault enableDamping dampingFactor={0.1} />;
 };
 
@@ -774,10 +1319,111 @@ export function CanvasTab() {
   const { state: appState, dispatch } = useAppContext();
   const proposals = useStore(state => state.proposals);
   const [currentIssueIndex, setCurrentIssueIndex] = useState(0);
-  const [dragMode, setDragMode] = useState(false);
   const dragOrbitRef = useRef(null); // shared ref for orbit controls disable during drag
 
+  // Store Connections
+  const canvasMode = useStore(state => state.canvasMode);
+  const setCanvasMode = useStore(state => state.setCanvasMode);
+  const showGapRadar = useStore(state => state.showGapRadar);
+  const setShowGapRadar = useStore(state => state.setShowGapRadar);
+  const showEPLabels = useStore(state => state.showEPLabels);
+  const setShowEPLabels = useStore(state => state.setShowEPLabels);
+  const dragAxisLock = useStore(state => state.dragAxisLock);
+  const setDragAxisLock = useStore(state => state.setDragAxisLock);
+  const undo = useStore(state => state.undo);
+  const clearMultiSelect = useStore(state => state.clearMultiSelect);
+  const multiSelectedIds = useStore(state => state.multiSelectedIds);
+  const deleteElements = useStore(state => state.deleteElements);
+  const dataTable = useStore(state => state.dataTable);
+  const pushHistory = useStore(state => state.pushHistory);
+
   const snapResolution = appState.config?.smartFixer?.gridSnapResolution ?? 100;
+
+  // Hover tracking for tooltips
+  const setHovered = useStore(state => state.setHovered);
+  const hoverTimer = useRef(null);
+
+  const handlePointerEnterMesh = useCallback((rowIndex) => {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+      hoverTimer.current = setTimeout(() => setHovered(rowIndex), 150);
+  }, [setHovered]);
+
+  const handlePointerLeaveMesh = useCallback(() => {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+      setHovered(null);
+  }, [setHovered]);
+
+  // Global Key Handler
+  useEffect(() => {
+      const handleKeyDown = (e) => {
+          // Ignore if typing in an input
+          if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+
+          switch (e.key.toLowerCase()) {
+              case 'escape':
+                  setCanvasMode('VIEW');
+                  clearMultiSelect();
+                  useStore.getState().setSelected(null);
+                  break;
+              case 'c': setCanvasMode(canvasMode === 'CONNECT' ? 'VIEW' : 'CONNECT'); break;
+              case 'b': setCanvasMode(canvasMode === 'BREAK' ? 'VIEW' : 'BREAK'); break;
+              case 'm': setCanvasMode(canvasMode === 'MEASURE' ? 'VIEW' : 'MEASURE'); break;
+              case 's': setCanvasMode(canvasMode === 'INSERT_SUPPORT' ? 'VIEW' : 'INSERT_SUPPORT'); break;
+              case 'x': setDragAxisLock('X'); break;
+              case 'y': setDragAxisLock('Y'); break;
+              case 'z': setDragAxisLock('Z'); break;
+              case 'f':
+                  if (useStore.getState().selectedElementId) {
+                      const el = dataTable.find(r => r._rowIndex === useStore.getState().selectedElementId);
+                      if (el && el.ep1) {
+                          window.dispatchEvent(new CustomEvent('canvas-focus-point', { detail: { x: el.ep1.x, y: el.ep1.y, z: el.ep1.z, dist: 2000 } }));
+                      }
+                  }
+                  break;
+              case 'delete':
+              case 'backspace':
+                  if (multiSelectedIds.length > 0) {
+                      if (window.confirm(`Delete ${multiSelectedIds.length} elements?`)) {
+                          pushHistory('Delete Keyboard');
+                          dispatch({ type: 'DELETE_ELEMENTS', payload: { rowIndices: multiSelectedIds } });
+                          deleteElements(multiSelectedIds);
+                          dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Applied/Fix", message: `Deleted ${multiSelectedIds.length} elements via keyboard.` } });
+                      }
+                  } else if (useStore.getState().selectedElementId) {
+                      const selId = useStore.getState().selectedElementId;
+                      if (window.confirm(`Delete Row ${selId}?`)) {
+                          pushHistory('Delete Keyboard');
+                          dispatch({ type: 'DELETE_ELEMENTS', payload: { rowIndices: [selId] } });
+                          deleteElements([selId]);
+                          useStore.getState().setSelected(null);
+                          dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Applied/Fix", message: `Deleted Row ${selId} via keyboard.` } });
+                      }
+                  }
+                  break;
+              default:
+                  // Ctrl+Z
+                  if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      undo();
+                  }
+                  break;
+          }
+      };
+
+      const handleKeyUp = (e) => {
+          if (['x', 'y', 'z'].includes(e.key.toLowerCase())) {
+              setDragAxisLock(null);
+          }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      window.addEventListener('keyup', handleKeyUp);
+      return () => {
+          window.removeEventListener('keydown', handleKeyDown);
+          window.removeEventListener('keyup', handleKeyUp);
+      };
+  }, [canvasMode, setCanvasMode, clearMultiSelect, setDragAxisLock, undo, multiSelectedIds, dispatch, pushHistory, deleteElements, dataTable]);
+
 
   const handleDragCommit = useCallback((rowIndex, coords) => {
     // Filter out null coord fields
@@ -861,33 +1507,128 @@ export function CanvasTab() {
       }
   };
 
+  const executeFix6mm = () => {
+      pushHistory('Fix 6mm Gaps');
+      const { updatedTable, fixLog } = fix6mmGaps(dataTable);
+      useStore.getState().setDataTable(updatedTable);
+      dispatch({ type: 'APPLY_GAP_FIX', payload: { updatedTable } });
+      fixLog.forEach(log => dispatch({ type: "ADD_LOG", payload: log }));
+  };
+
+  const executeFix25mm = () => {
+      pushHistory('Fix 25mm Gaps');
+      const { updatedTable, fixLog } = fix25mmGapsWithPipe(dataTable);
+      useStore.getState().setDataTable(updatedTable);
+      dispatch({ type: 'APPLY_GAP_FIX', payload: { updatedTable } });
+      fixLog.forEach(log => dispatch({ type: "ADD_LOG", payload: log }));
+  };
+
 
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)] w-full overflow-hidden bg-slate-950 rounded-lg border border-slate-800 shadow-inner relative">
 
-      {/* Canvas Overlay UI */}
-      <div className="absolute top-4 left-4 z-10 pointer-events-none">
-        <h2 className="text-slate-200 font-bold text-lg drop-shadow-md">3D Topology Canvas</h2>
-        <p className="text-slate-400 text-xs mt-1">Note: Visualization reflects data from Stage 2.</p>
-        <p className="text-slate-500 text-[10px] mt-0.5">Left-click element to focus/orbit, Right-click pan, Scroll zoom.</p>
-      </div>
+      {/* New UI Overlays */}
+      <SceneHealthHUD />
+      <SideInspector />
+      <SupportPropertyPanel />
+      <LogDrawer />
+      <HoverTooltip />
 
       <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 items-end">
+
+        {/* Restructured Toolbar */}
+        <div className="flex bg-slate-800/80 backdrop-blur border border-slate-700 p-1 rounded-lg shadow-lg gap-2">
+
+            {/* Mode Buttons (Left) */}
+            <div className="flex border-r border-slate-700 pr-2 gap-1">
+                <button
+                    onClick={() => setCanvasMode(canvasMode === 'CONNECT' ? 'VIEW' : 'CONNECT')}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'CONNECT' ? 'bg-amber-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                    title="CONNECT Mode (C)"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                </button>
+                <button
+                    onClick={() => setCanvasMode(canvasMode === 'BREAK' ? 'VIEW' : 'BREAK')}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'BREAK' ? 'bg-red-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                    title="BREAK Mode (B)"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+                </button>
+                <button
+                    onClick={() => setCanvasMode(canvasMode === 'MEASURE' ? 'VIEW' : 'MEASURE')}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'MEASURE' ? 'bg-yellow-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                    title="MEASURE Mode (M)"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 1 0 2.829 2.828z"/><path d="m6.3 14.5-4 4"/><path d="m16 5.3-4 4"/></svg>
+                </button>
+                <button
+                    onClick={() => setCanvasMode(canvasMode === 'INSERT_SUPPORT' ? 'VIEW' : 'INSERT_SUPPORT')}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'INSERT_SUPPORT' ? 'bg-green-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                    title="INSERT SUPPORT Mode (S)"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                </button>
+            </div>
+
+            {/* Toggle Buttons (Right) */}
+            <div className="flex gap-1 pl-1">
+                <button
+                    onClick={() => setShowGapRadar(!showGapRadar)}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition ${showGapRadar ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                    title="Toggle Gap Radar"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                </button>
+                <button
+                    onClick={() => setShowEPLabels(!showEPLabels)}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition ${showEPLabels ? 'bg-slate-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                    title="Toggle EP Labels"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+                </button>
+                <button
+                    onClick={undo}
+                    className="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-700 text-slate-400 transition"
+                    title="Undo (Ctrl+Z)"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                </button>
+            </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="flex gap-2">
+            <button
+                onClick={executeFix6mm}
+                className="bg-orange-900/40 hover:bg-orange-800 text-orange-400 border border-orange-800/50 px-2 py-1 rounded text-xs font-medium transition"
+                title="Auto-close all gaps ≤ 6mm"
+            >
+                Fix 6mm
+            </button>
+            <button
+                onClick={executeFix25mm}
+                className="bg-red-900/40 hover:bg-red-800 text-red-400 border border-red-800/50 px-2 py-1 rounded text-xs font-medium transition"
+                title="Insert pipe spool for gaps 6-25mm"
+            >
+                Fix 25mm
+            </button>
+        </div>
+
+        {canvasMode !== 'VIEW' && (
+            <div className="mt-2 bg-slate-800/90 text-slate-200 text-xs px-3 py-1.5 rounded border border-slate-600 shadow-md">
+                MODE: <strong>{canvasMode.replace('_', ' ')}</strong>
+                <span className="ml-2 text-slate-400">Esc to cancel</span>
+            </div>
+        )}
+
         <button
             onClick={handleAutoCenter}
-            className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-700 shadow flex items-center gap-2 text-sm transition-colors"
+            className="mt-4 bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-700 shadow flex items-center gap-2 text-sm transition-colors"
             title="Auto Center Camera"
         >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3h6"/><path d="M3 3v6"/><path d="M21 3h-6"/><path d="M21 3v6"/><path d="M3 21h6"/><path d="M3 21v-6"/><path d="M21 21h-6"/><path d="M21 21v-6"/></svg>
             Auto Center
-        </button>
-        <button
-            onClick={() => setDragMode(m => !m)}
-            className={`px-3 py-1.5 rounded border shadow flex items-center gap-2 text-sm transition-colors ${dragMode ? 'bg-amber-500 hover:bg-amber-400 text-white border-amber-600' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'}`}
-            title={dragMode ? "Exit Drag Edit Mode" : "Enter Drag Edit Mode (snap-to-grid)"}
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>
-            {dragMode ? `Drag ON (${snapResolution}mm snap)` : "Drag Edit"}
         </button>
       </div>
 
@@ -911,13 +1652,28 @@ export function CanvasTab() {
 
         <InstancedPipes />
         <ImmutableComponents />
-        {dragMode && (
-          <DraggableComponents
-            snapResolution={snapResolution}
-            onDragCommit={handleDragCommit}
-            orbitRef={dragOrbitRef}
-          />
+        {/* We use the canvasMode for dragging now but will maintain legacy dragMode if needed, or unify.
+            Since dragging is implicit in CAD tools, let's keep it tied to VIEW mode or a specific DRAG mode.
+            The original prompt implies drag editing should be the default when just clicking.
+            However, we have specific modes now. Let's make VIEW mode the drag mode to maintain existing behavior,
+            but only if no other mode is active.
+        */}
+        {canvasMode === 'VIEW' && (
+          <group onPointerOver={(e) => { e.stopPropagation(); handlePointerEnterMesh(e.object.userData?.rowIndex); }} onPointerOut={handlePointerLeaveMesh}>
+              <DraggableComponents
+                snapResolution={snapResolution}
+                onDragCommit={handleDragCommit}
+                orbitRef={dragOrbitRef}
+              />
+          </group>
         )}
+
+        <EndpointSnapLayer />
+        <GapRadarLayer />
+        <MeasureTool />
+        <BreakPipeLayer />
+        <InsertSupportLayer />
+        <EPLabelsLayer />
 
         {(() => {
             const allIssues = [
