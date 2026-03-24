@@ -1,0 +1,53 @@
+ISOGEN-FILES ISOGEN.FLS
+UNITS-BORE MM
+UNITS-CO-ORDS MM
+UNITS-WEIGHT KGS
+PIPELINE-REFERENCE FIXER-TEST-01
+REVISION 0
+
+PIPE
+    END-POINT  0.0 0.0 0.0  150
+    END-POINT  1000.0 0.0 0.0  150
+    ITEM-CODE PIPE-1
+FLANGE
+    END-POINT  1000.0 0.0 0.0  150
+    END-POINT  1050.0 0.0 0.0  150
+    ITEM-CODE FLG-1
+FLANGE
+    END-POINT  1051.0 0.0 0.0  150 // 1mm Flange-to-Flange gap
+    END-POINT  1101.0 0.0 0.0  150
+    ITEM-CODE FLG-2
+FLANGE
+    END-POINT  1104.0 0.0 0.0  150 // 3mm Flange-to-Flange gap
+    END-POINT  1154.0 0.0 0.0  150
+    ITEM-CODE FLG-3
+FLANGE
+    END-POINT  1204.0 0.0 0.0  150 // 50mm Flange-to-Flange gap
+    END-POINT  1254.0 0.0 0.0  150
+    ITEM-CODE FLG-4
+FLANGE
+    END-POINT  1754.0 0.0 0.0  150 // 500mm Flange-to-Flange gap (Missing Valve)
+    END-POINT  1804.0 0.0 0.0  150
+    ITEM-CODE FLG-5
+PIPE
+    END-POINT  1804.0 0.0 0.0  150
+    END-POINT  3000.0 0.0 0.0  150
+    ITEM-CODE PIPE-2
+// Broken Geometry at Bend
+ELBOW
+    END-POINT  3010.0 0.0 0.0  150 // 10mm gap before bend
+    END-POINT  3010.0 500.0 0.0  150
+    // Missing CP
+    ITEM-CODE ELB-1
+PIPE
+    END-POINT  3020.0 500.0 0.0  150 // 10mm skew out of bend
+    END-POINT  3020.0 1500.0 0.0  150
+    ITEM-CODE PIPE-3
+OLET
+    END-POINT  3020.0 1000.0 0.0  150
+    END-POINT  3020.0 1000.0 80.0  50 // Olet starts 80mm off center, but pipe OD is only 75mm (Olet floating 5mm off pipe OD)
+    ITEM-CODE OLET-1
+PIPE
+    END-POINT  3020.0 1000.0 80.0  50
+    END-POINT  3020.0 1000.0 500.0  50
+    ITEM-CODE PIPE-4

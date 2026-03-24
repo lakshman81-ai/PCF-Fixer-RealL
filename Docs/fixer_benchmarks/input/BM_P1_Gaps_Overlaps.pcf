@@ -1,0 +1,53 @@
+ISOGEN-FILES ISOGEN.FLS
+UNITS-BORE MM
+UNITS-CO-ORDS MM
+UNITS-WEIGHT KGS
+PIPELINE-REFERENCE FIXER-TEST-01
+REVISION 0
+
+PIPE
+    END-POINT  0.0 0.0 0.0  100
+    END-POINT  1000.0 0.0 0.0  100
+    ITEM-CODE PIPE-1
+PIPE
+    END-POINT  1001.0 0.0 0.0  100  // Valid 1mm gap
+    END-POINT  2000.0 0.0 0.0  100
+    ITEM-CODE PIPE-2
+VALVE
+    END-POINT  2005.0 0.0 0.0  100  // Valid 5mm gap Pipe-to-Valve
+    END-POINT  2305.0 0.0 0.0  100
+    ITEM-CODE VAL-1
+PIPE
+    END-POINT  2375.0 0.0 0.0  100  // Valid 70mm gap Valve-to-Pipe
+    END-POINT  3000.0 0.0 0.0  100
+    ITEM-CODE PIPE-3
+ELBOW
+    END-POINT  4000.0 0.0 0.0  100  // Valid 1000mm gap Pipe-to-Bend
+    END-POINT  4000.0 500.0 0.0  100
+    CENTRE-POINT  4000.0 0.0 0.0
+    ITEM-CODE ELB-1
+PIPE
+    END-POINT  4000.0 500.0 0.0  100
+    END-POINT  4000.0 1500.0 0.0  100
+    ITEM-CODE PIPE-4
+PIPE
+    END-POINT  4000.0 1300.0 0.0  100 // Valid 200mm overlap
+    END-POINT  4000.0 2000.0 0.0  100
+    ITEM-CODE PIPE-5
+PIPE
+    END-POINT  4000.0 2000.0 0.0  100 
+    END-POINT  4000.0 1800.0 0.0  100 // Foldback (pipe doubling back on itself)
+    ITEM-CODE PIPE-6
+PIPE
+    END-POINT  4000.0 2000.0 0.0  100 
+    END-POINT  4000.0 3000.0 0.0  100
+    ITEM-CODE PIPE-7
+// INVALID CASES (Should be flagged, not auto-fixed)
+PIPE
+    END-POINT  4000.0 8000.0 0.0  100 // Invalid 5000mm Gap (Phase 1 should flag for manual review)
+    END-POINT  4000.0 10000.0 0.0  100
+    ITEM-CODE PIPE-8
+PIPE
+    END-POINT  4000.0 6000.0 0.0  100 // Invalid 4000mm Overlap (Phase 1 should flag for manual review)
+    END-POINT  4000.0 11000.0 0.0  100
+    ITEM-CODE PIPE-9

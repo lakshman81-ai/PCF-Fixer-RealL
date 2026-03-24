@@ -1,0 +1,64 @@
+ISOGEN-FILES ISOGEN.FLS
+UNITS-BORE MM
+UNITS-CO-ORDS MM
+UNITS-WEIGHT KGS
+PIPELINE-REFERENCE FIXER-TEST-01
+REVISION 0
+
+PIPE
+    END-POINT  0.0 0.0 0.0  150
+    END-POINT  1000.0 0.0 0.0  150
+    ITEM-CODE PIPE-1
+FLANGE
+    END-POINT  1000.0 0.0 0.0  150
+    END-POINT  1050.0 0.0 0.0  150
+    ITEM-CODE FLG-1
+FLANGE
+    END-POINT  1050.0 0.0 0.0  150 // Fix: 1mm gap snapped Flange-to-Flange
+    END-POINT  1100.0 0.0 0.0  150
+    ITEM-CODE FLG-2
+GASKET
+    END-POINT  1100.0 0.0 0.0  150 // Fix: 3mm gap resolved into a Gasket
+    END-POINT  1103.0 0.0 0.0  150
+    ITEM-CODE SYNTH-GSK-1
+FLANGE
+    END-POINT  1103.0 0.0 0.0  150
+    END-POINT  1153.0 0.0 0.0  150
+    ITEM-CODE FLG-3
+PIPE
+    END-POINT  1153.0 0.0 0.0  150 // Fix: 50mm gap filled with a spool piece (too big for gasket)
+    END-POINT  1203.0 0.0 0.0  150
+    ITEM-CODE SYNTH-PIPE-1
+FLANGE
+    END-POINT  1203.0 0.0 0.0  150 
+    END-POINT  1253.0 0.0 0.0  150
+    ITEM-CODE FLG-4
+VALVE
+    END-POINT  1253.0 0.0 0.0  150 // Fix: 500mm gap between flanges implies missing Valve.
+    END-POINT  1753.0 0.0 0.0  150
+    ITEM-CODE SYNTH-VAL-1
+FLANGE
+    END-POINT  1753.0 0.0 0.0  150 
+    END-POINT  1803.0 0.0 0.0  150
+    ITEM-CODE FLG-5
+PIPE
+    END-POINT  1803.0 0.0 0.0  150
+    END-POINT  3000.0 0.0 0.0  150 // Fix: Stretched to meet snapped elbow
+    ITEM-CODE PIPE-2
+ELBOW
+    END-POINT  3000.0 0.0 0.0  150 // Fix: 10mm gap snapped, CP reconstructed
+    END-POINT  3000.0 500.0 0.0  150
+    CENTRE-POINT  3000.0 0.0 0.0
+    ITEM-CODE ELB-1
+PIPE
+    END-POINT  3000.0 500.0 0.0  150 // Fix: 10mm skew snapped back to orthogonal
+    END-POINT  3000.0 1500.0 0.0  150
+    ITEM-CODE PIPE-3
+OLET
+    END-POINT  3000.0 1000.0 0.0  150  // Fix: Olet snapped to pipe OD exactly (75mm)
+    END-POINT  3000.0 1000.0 75.0  50 
+    ITEM-CODE OLET-1
+PIPE
+    END-POINT  3000.0 1000.0 75.0  50
+    END-POINT  3000.0 1000.0 500.0  50
+    ITEM-CODE PIPE-4

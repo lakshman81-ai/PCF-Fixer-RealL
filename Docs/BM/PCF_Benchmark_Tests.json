@@ -1,0 +1,3825 @@
+[
+  {
+    "id": "BM-V-01",
+    "group": "validation",
+    "rule": "V1",
+    "description": "V1: Detect (0,0,0) in EP1 \u2014 must flag ERROR",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 350,
+        "ep1": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "ep2": {
+          "x": 1000,
+          "y": 0,
+          "z": 0
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V1",
+      "severity": "ERROR",
+      "row": 0,
+      "field": "ep1"
+    }
+  },
+  {
+    "id": "BM-V-02",
+    "group": "validation",
+    "rule": "V1",
+    "description": "V1: Single zero axis (0,5000,3000) is valid \u2014 no error",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 350,
+        "ep1": {
+          "x": 0,
+          "y": 5000,
+          "z": 3000
+        },
+        "ep2": {
+          "x": 0,
+          "y": 6000,
+          "z": 3000
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V1",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-V-03",
+    "group": "validation",
+    "rule": "V1",
+    "description": "V1: SUPPORT at (0,0,0) \u2014 must flag ERROR",
+    "input": [
+      {
+        "type": "SUPPORT",
+        "bore": 0,
+        "ep1": null,
+        "ep2": null,
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "supportName": "ANC",
+        "supportGuid": "UCI:X",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V1",
+      "severity": "ERROR",
+      "row": 0,
+      "field": "supportCoor"
+    }
+  },
+  {
+    "id": "BM-V-04",
+    "group": "validation",
+    "rule": "V2",
+    "description": "V2: Bore as integer (400) vs coords 4-decimal \u2014 ERROR at generation",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400.0,
+          "y": 17986.4,
+          "z": 101968.0
+        },
+        "ep2": {
+          "x": 96400.0,
+          "y": 17840.4,
+          "z": 101968.0
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "config": {
+      "decimals": 4
+    },
+    "expected": {
+      "ruleId": "V2",
+      "severity": "ERROR",
+      "note": "Bore must be 400.0000 not 400"
+    }
+  },
+  {
+    "id": "BM-V-05",
+    "group": "validation",
+    "rule": "V2",
+    "description": "V2: All coords and bore at 4-decimal \u2014 PASS",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400.0,
+        "ep1": {
+          "x": 96400.0,
+          "y": 17986.4,
+          "z": 101968.0
+        },
+        "ep2": {
+          "x": 96400.0,
+          "y": 17840.4,
+          "z": 101968.0
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "config": {
+      "decimals": 4
+    },
+    "expected": {
+      "ruleId": "V2",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-V-06",
+    "group": "validation",
+    "rule": "V3",
+    "description": "V3: REDUCER with EP1 bore=400, EP2 bore=400 \u2014 ERROR (not a reducer)",
+    "input": [
+      {
+        "type": "REDUCER-CONCENTRIC",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16800,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": 400,
+        "skey": "RCBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V3",
+      "severity": "ERROR",
+      "row": 0
+    }
+  },
+  {
+    "id": "BM-V-07",
+    "group": "validation",
+    "rule": "V3",
+    "description": "V3: REDUCER EP1=400, EP2=350 \u2014 PASS",
+    "input": [
+      {
+        "type": "REDUCER-CONCENTRIC",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16800,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": 350,
+        "skey": "RCBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V3",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-V-08",
+    "group": "validation",
+    "rule": "V3",
+    "description": "V3: PIPE bore changes 400\u2192350 without being reducer \u2014 ERROR",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 350,
+        "ep1": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V3",
+      "severity": "ERROR",
+      "row": 1,
+      "note": "Bore changed without reducer"
+    }
+  },
+  {
+    "id": "BM-V-09",
+    "group": "validation",
+    "rule": "V4",
+    "description": "V4: BEND CP equals EP1 \u2014 degenerate bend ERROR",
+    "input": [
+      {
+        "type": "BEND",
+        "bore": 350,
+        "ep1": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 103827
+        },
+        "ep2": {
+          "x": 95867,
+          "y": 16586.4,
+          "z": 104360
+        },
+        "cp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 103827
+        },
+        "bp": null,
+        "branchBore": null,
+        "skey": "BEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V4",
+      "severity": "ERROR",
+      "row": 0
+    }
+  },
+  {
+    "id": "BM-V-10",
+    "group": "validation",
+    "rule": "V5",
+    "description": "V5: BEND CP equals EP2 \u2014 degenerate bend ERROR",
+    "input": [
+      {
+        "type": "BEND",
+        "bore": 350,
+        "ep1": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 103827
+        },
+        "ep2": {
+          "x": 95867,
+          "y": 16586.4,
+          "z": 104360
+        },
+        "cp": {
+          "x": 95867,
+          "y": 16586.4,
+          "z": 104360
+        },
+        "bp": null,
+        "branchBore": null,
+        "skey": "BEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V5",
+      "severity": "ERROR",
+      "row": 0
+    }
+  },
+  {
+    "id": "BM-V-11",
+    "group": "validation",
+    "rule": "V6",
+    "description": "V6: BEND CP on EP1-EP2 line (collinear) \u2014 ERROR",
+    "input": [
+      {
+        "type": "BEND",
+        "bore": 350,
+        "ep1": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 103000
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 105000
+        },
+        "cp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 104000
+        },
+        "bp": null,
+        "branchBore": null,
+        "skey": "BEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V6",
+      "severity": "ERROR",
+      "row": 0,
+      "note": "CP is on the EP1-EP2 line"
+    }
+  },
+  {
+    "id": "BM-V-12",
+    "group": "validation",
+    "rule": "V6",
+    "description": "V6: BEND CP properly off EP1-EP2 line \u2014 PASS",
+    "input": [
+      {
+        "type": "BEND",
+        "bore": 350,
+        "ep1": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 103827
+        },
+        "ep2": {
+          "x": 95867,
+          "y": 16586.4,
+          "z": 104360
+        },
+        "cp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 104360
+        },
+        "bp": null,
+        "branchBore": null,
+        "skey": "BEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V6",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-V-13",
+    "group": "validation",
+    "rule": "V7",
+    "description": "V7: BEND dist(CP,EP1)=500, dist(CP,EP2)=505 \u2014 WARNING",
+    "input": [
+      {
+        "type": "BEND",
+        "bore": 350,
+        "ep1": {
+          "x": 10000,
+          "y": 5000,
+          "z": 3000
+        },
+        "ep2": {
+          "x": 9500,
+          "y": 5000,
+          "z": 3505
+        },
+        "cp": {
+          "x": 10000,
+          "y": 5000,
+          "z": 3500
+        },
+        "bp": null,
+        "branchBore": null,
+        "skey": "BEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V7",
+      "severity": "WARNING",
+      "row": 0,
+      "note": "dist(CP,EP1)=500.0, dist(CP,EP2)\u2248505.0"
+    }
+  },
+  {
+    "id": "BM-V-14",
+    "group": "validation",
+    "rule": "V7",
+    "description": "V7: BEND CP equidistant from EP1 and EP2 \u2014 PASS",
+    "input": [
+      {
+        "type": "BEND",
+        "bore": 350,
+        "ep1": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 103827
+        },
+        "ep2": {
+          "x": 95867,
+          "y": 16586.4,
+          "z": 104360
+        },
+        "cp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 104360
+        },
+        "bp": null,
+        "branchBore": null,
+        "skey": "BEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V7",
+      "severity": "NONE",
+      "note": "dist(CP,EP1)=533.0, dist(CP,EP2)=533.0"
+    }
+  },
+  {
+    "id": "BM-V-15",
+    "group": "validation",
+    "rule": "V8",
+    "description": "V8: TEE CP off midpoint by 5mm \u2014 ERROR",
+    "input": [
+      {
+        "type": "TEE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 16891.4,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16281.4,
+          "z": 101968
+        },
+        "cp": {
+          "x": 96400,
+          "y": 16591.4,
+          "z": 101968
+        },
+        "bp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 102273
+        },
+        "branchBore": 350,
+        "skey": "TEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V8",
+      "severity": "ERROR",
+      "row": 0,
+      "note": "Expected CP.y=16586.4, got 16591.4 (5mm off)"
+    }
+  },
+  {
+    "id": "BM-V-16",
+    "group": "validation",
+    "rule": "V8",
+    "description": "V8: TEE CP at exact midpoint \u2014 PASS",
+    "input": [
+      {
+        "type": "TEE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 16891.4,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16281.4,
+          "z": 101968
+        },
+        "cp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 101968
+        },
+        "bp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 102273
+        },
+        "branchBore": 350,
+        "skey": "TEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V8",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-V-17",
+    "group": "validation",
+    "rule": "V9",
+    "description": "V9: TEE CP bore=350 but EP bore=400 \u2014 ERROR",
+    "input": [
+      {
+        "type": "TEE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 16891.4,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16281.4,
+          "z": 101968
+        },
+        "cp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 101968
+        },
+        "bp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 102273
+        },
+        "branchBore": 350,
+        "skey": "TEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V9",
+      "severity": "ERROR",
+      "row": 0,
+      "note": "CP bore must match EP bore (header bore). Test gives cp_bore=350 vs ep_bore=400."
+    },
+    "note_to_agent": "The cp object itself doesn't carry bore in the schema\u2014bore is on the row. Test the config/rule logic that checks cp bore inheritance. For this test, assume a way to detect cp_bore != row.bore scenario."
+  },
+  {
+    "id": "BM-V-18",
+    "group": "validation",
+    "rule": "V10",
+    "description": "V10: TEE BP 30\u00b0 from perpendicular \u2014 WARNING",
+    "input": [
+      {
+        "type": "TEE",
+        "bore": 400,
+        "ep1": {
+          "x": 50000,
+          "y": 20000,
+          "z": 10000
+        },
+        "ep2": {
+          "x": 50000,
+          "y": 19000,
+          "z": 10000
+        },
+        "cp": {
+          "x": 50000,
+          "y": 19500,
+          "z": 10000
+        },
+        "bp": {
+          "x": 50300,
+          "y": 19200,
+          "z": 10000
+        },
+        "branchBore": 350,
+        "skey": "TEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V10",
+      "severity": "WARNING",
+      "row": 0,
+      "note": "Branch vec (300,-300,0) is ~45\u00b0 from perp to header vec (0,-1000,0)"
+    }
+  },
+  {
+    "id": "BM-V-19",
+    "group": "validation",
+    "rule": "V10",
+    "description": "V10: TEE BP exactly perpendicular \u2014 PASS",
+    "input": [
+      {
+        "type": "TEE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 16891.4,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16281.4,
+          "z": 101968
+        },
+        "cp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 101968
+        },
+        "bp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 102273
+        },
+        "branchBore": 350,
+        "skey": "TEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V10",
+      "severity": "NONE",
+      "note": "Header runs Y, branch runs Z \u2014 perpendicular"
+    }
+  },
+  {
+    "id": "BM-V-20",
+    "group": "validation",
+    "rule": "V11",
+    "description": "V11: OLET with EP1 populated \u2014 ERROR",
+    "input": [
+      {
+        "type": "OLET",
+        "bore": 350,
+        "ep1": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 103677
+        },
+        "ep2": null,
+        "cp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 103677
+        },
+        "bp": {
+          "x": 96400,
+          "y": 16370.5,
+          "z": 103677
+        },
+        "branchBore": 50,
+        "skey": "OLWL",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V11",
+      "severity": "ERROR",
+      "row": 0
+    }
+  },
+  {
+    "id": "BM-V-21",
+    "group": "validation",
+    "rule": "V11",
+    "description": "V11: OLET with only CP and BP, no EPs \u2014 PASS",
+    "input": [
+      {
+        "type": "OLET",
+        "bore": 350,
+        "ep1": null,
+        "ep2": null,
+        "cp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 103677
+        },
+        "bp": {
+          "x": 96400,
+          "y": 16370.5,
+          "z": 103677
+        },
+        "branchBore": 50,
+        "skey": "OLWL",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V11",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-V-22",
+    "group": "validation",
+    "rule": "V12",
+    "description": "V12: SUPPORT with CA1 populated \u2014 ERROR",
+    "input": [
+      {
+        "type": "SUPPORT",
+        "bore": 0,
+        "ep1": null,
+        "ep2": null,
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": {
+          "x": 96400,
+          "y": 17186.4,
+          "z": 101968
+        },
+        "supportName": "ANC",
+        "supportGuid": "UCI:PS001",
+        "ca": {
+          "1": "700 KPA"
+        },
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V12",
+      "severity": "ERROR",
+      "row": 0
+    }
+  },
+  {
+    "id": "BM-V-23",
+    "group": "validation",
+    "rule": "V12",
+    "description": "V12: SUPPORT with no CAs \u2014 PASS",
+    "input": [
+      {
+        "type": "SUPPORT",
+        "bore": 0,
+        "ep1": null,
+        "ep2": null,
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": {
+          "x": 96400,
+          "y": 17186.4,
+          "z": 101968
+        },
+        "supportName": "ANC",
+        "supportGuid": "UCI:PS001",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V12",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-V-24",
+    "group": "validation",
+    "rule": "V13",
+    "description": "V13: SUPPORT bore=350 (must be 0) \u2014 ERROR",
+    "input": [
+      {
+        "type": "SUPPORT",
+        "bore": 350,
+        "ep1": null,
+        "ep2": null,
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": {
+          "x": 96400,
+          "y": 17186.4,
+          "z": 101968
+        },
+        "supportName": "ANC",
+        "supportGuid": "UCI:PS001",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V13",
+      "severity": "ERROR",
+      "row": 0
+    }
+  },
+  {
+    "id": "BM-V-25",
+    "group": "validation",
+    "rule": "V13",
+    "description": "V13: SUPPORT bore=0 \u2014 PASS",
+    "input": [
+      {
+        "type": "SUPPORT",
+        "bore": 0,
+        "ep1": null,
+        "ep2": null,
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": {
+          "x": 96400,
+          "y": 17186.4,
+          "z": 101968
+        },
+        "supportName": "ANC",
+        "supportGuid": "UCI:PS001",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V13",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-V-26",
+    "group": "validation",
+    "rule": "V14",
+    "description": "V14: FLANGE with empty SKEY \u2014 WARNING",
+    "input": [
+      {
+        "type": "FLANGE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17986.4,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17840.4,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V14",
+      "severity": "WARNING",
+      "row": 0
+    }
+  },
+  {
+    "id": "BM-V-27",
+    "group": "validation",
+    "rule": "V14",
+    "description": "V14: PIPE with empty SKEY \u2014 PASS (not required for PIPE)",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17840.4,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17186.4,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V14",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-V-28",
+    "group": "validation",
+    "rule": "V15",
+    "description": "V15: EP2[0] and EP1[1] differ by 5mm \u2014 WARNING",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 16995,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V15",
+      "severity": "WARNING",
+      "row": 1,
+      "note": "EP2[0].y=17000 vs EP1[1].y=16995 \u2014 5mm gap"
+    }
+  },
+  {
+    "id": "BM-V-29",
+    "group": "validation",
+    "rule": "V15",
+    "description": "V15: EP2[0] exactly equals EP1[1] \u2014 PASS",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V15",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-V-30",
+    "group": "validation",
+    "rule": "V16",
+    "description": "V16: PIPE with CA8 (weight) populated \u2014 WARNING",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {
+          "8": "100 KG"
+        },
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V16",
+      "severity": "WARNING",
+      "row": 0
+    }
+  },
+  {
+    "id": "BM-V-31",
+    "group": "validation",
+    "rule": "V16",
+    "description": "V16: FLANGE without CA8 \u2014 INFO (not error, just note)",
+    "input": [
+      {
+        "type": "FLANGE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17986.4,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17840.4,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "FLWN",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V16",
+      "severity": "INFO",
+      "row": 0
+    }
+  },
+  {
+    "id": "BM-V-32",
+    "group": "validation",
+    "rule": "V17",
+    "description": "V17: PCF output with \\n instead of \\r\\n \u2014 ERROR",
+    "input_pcf": "ISOGEN-FILES ISOGEN.FLS\nUNITS-BORE MM\n",
+    "expected": {
+      "ruleId": "V17",
+      "severity": "ERROR",
+      "note": "Contains bare \\n without \\r"
+    }
+  },
+  {
+    "id": "BM-V-33",
+    "group": "validation",
+    "rule": "V18",
+    "description": "V18: Bore=16 (not in std mm set, \u226448) \u2014 WARNING (likely inches)",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 16,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V18",
+      "severity": "WARNING",
+      "row": 0,
+      "note": "16 not in std mm set, \u226448 \u2192 likely 16 inches = 406.4mm"
+    }
+  },
+  {
+    "id": "BM-V-34",
+    "group": "validation",
+    "rule": "V18",
+    "description": "V18: Bore=400 (in std mm set) \u2014 PASS",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V18",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-V-35",
+    "group": "validation",
+    "rule": "V19",
+    "description": "V19: SUPPORT MESSAGE-SQUARE contains LENGTH token \u2014 WARNING",
+    "input": [
+      {
+        "type": "SUPPORT",
+        "bore": 0,
+        "ep1": null,
+        "ep2": null,
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": {
+          "x": 96400,
+          "y": 17186.4,
+          "z": 101968
+        },
+        "supportName": "ANC",
+        "supportGuid": "UCI:PS001",
+        "ca": {},
+        "text": "SUPPORT, A106-B, LENGTH=100MM, SOUTH, RefNo:=X, SeqNo:3, ANC, UCI:PS001"
+      }
+    ],
+    "expected": {
+      "ruleId": "V19",
+      "severity": "WARNING",
+      "row": 0
+    }
+  },
+  {
+    "id": "BM-V-36",
+    "group": "validation",
+    "rule": "V19",
+    "description": "V19: SUPPORT MESSAGE-SQUARE with only RefNo/SeqNo/Name/GUID \u2014 PASS",
+    "input": [
+      {
+        "type": "SUPPORT",
+        "bore": 0,
+        "ep1": null,
+        "ep2": null,
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": {
+          "x": 96400,
+          "y": 17186.4,
+          "z": 101968
+        },
+        "supportName": "ANC",
+        "supportGuid": "UCI:PS001",
+        "ca": {},
+        "text": "SUPPORT, RefNo:=X, SeqNo:3, ANC, UCI:PS001"
+      }
+    ],
+    "expected": {
+      "ruleId": "V19",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-V-37",
+    "group": "validation",
+    "rule": "V20",
+    "description": "V20: SUPPORT_GUID missing UCI: prefix \u2014 ERROR",
+    "input": [
+      {
+        "type": "SUPPORT",
+        "bore": 0,
+        "ep1": null,
+        "ep2": null,
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": {
+          "x": 96400,
+          "y": 17186.4,
+          "z": 101968
+        },
+        "supportName": "ANC",
+        "supportGuid": "PS00178.1",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V20",
+      "severity": "ERROR",
+      "row": 0
+    }
+  },
+  {
+    "id": "BM-V-38",
+    "group": "validation",
+    "rule": "V20",
+    "description": "V20: SUPPORT_GUID with UCI: prefix \u2014 PASS",
+    "input": [
+      {
+        "type": "SUPPORT",
+        "bore": 0,
+        "ep1": null,
+        "ep2": null,
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": {
+          "x": 96400,
+          "y": 17186.4,
+          "z": 101968
+        },
+        "supportName": "ANC",
+        "supportGuid": "UCI:PS00178.1",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V20",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-V-39",
+    "group": "validation",
+    "rule": "V3",
+    "description": "V3: PIPE EP1 bore=350, EP2 bore=350 \u2014 PASS (non-reducer, same bore OK)",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 350,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V3",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-V-40",
+    "group": "validation",
+    "rule": "V14",
+    "description": "V14: TEE with SKEY=TEBW \u2014 PASS",
+    "input": [
+      {
+        "type": "TEE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 16891.4,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16281.4,
+          "z": 101968
+        },
+        "cp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 101968
+        },
+        "bp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 102273
+        },
+        "branchBore": 350,
+        "skey": "TEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "V14",
+      "severity": "NONE"
+    }
+  },
+  {
+    "id": "BM-SF-01",
+    "group": "smartfix",
+    "rule": "R-GEO-01",
+    "description": "R-GEO-01: 3mm micro-pipe \u2014 DELETE (Tier 1)",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16997,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 16997,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-GEO-01",
+      "tier": 1,
+      "action": "DELETE",
+      "row": 1,
+      "note": "Middle pipe is 3mm < 6mm threshold"
+    }
+  },
+  {
+    "id": "BM-SF-02",
+    "group": "smartfix",
+    "rule": "R-GEO-01",
+    "description": "R-GEO-01: 10mm pipe \u2014 no action (above threshold)",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16990,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 16990,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-GEO-01",
+      "action": "NONE",
+      "row": 1
+    }
+  },
+  {
+    "id": "BM-SF-03",
+    "group": "smartfix",
+    "rule": "R-GEO-02",
+    "description": "R-GEO-02: Bore 400\u2192350 without reducer \u2014 ERROR",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 350,
+        "ep1": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-GEO-02",
+      "tier": 4,
+      "row": 1
+    }
+  },
+  {
+    "id": "BM-SF-04",
+    "group": "smartfix",
+    "rule": "R-GEO-03",
+    "description": "R-GEO-03: Pipe with 1mm X-drift on Y-axis run \u2014 SNAP (Tier 2)",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96401,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-GEO-03",
+      "tier": 2,
+      "action": "SNAP_AXIS",
+      "note": "Dominant axis Y (1000mm), minor X drift 1mm \u2192 snap to pure Y"
+    }
+  },
+  {
+    "id": "BM-SF-05",
+    "group": "smartfix",
+    "rule": "R-GEO-03",
+    "description": "R-GEO-03: Pipe diagonal 50mm on 2 axes \u2014 ERROR",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96450,
+          "y": 17950,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-GEO-03",
+      "tier": 4,
+      "note": "X=50mm Y=-50mm \u2014 diagonal, can't snap (minor > 2mm)"
+    }
+  },
+  {
+    "id": "BM-SF-06",
+    "group": "smartfix",
+    "rule": "R-GEO-07",
+    "description": "R-GEO-07: Flange with EP1=EP2 (zero length) \u2014 ERROR",
+    "input": [
+      {
+        "type": "FLANGE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "FLWN",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-GEO-07",
+      "tier": 4,
+      "row": 0
+    }
+  },
+  {
+    "id": "BM-SF-07",
+    "group": "smartfix",
+    "rule": "R-CHN-01",
+    "description": "R-CHN-01: Pipe changes Y\u2192Z axis without bend \u2014 ERROR",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 102968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-CHN-01",
+      "tier": 4,
+      "row": 1,
+      "note": "Travel was Y-South, now Z-Up at PIPE \u2014 missing BEND"
+    }
+  },
+  {
+    "id": "BM-SF-08",
+    "group": "smartfix",
+    "rule": "R-CHN-02",
+    "description": "R-CHN-02: 5mm fold-back pipe (reverses Y direction) \u2014 DELETE (Tier 2)",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17005,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17005,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-CHN-02",
+      "tier": 2,
+      "action": "DELETE",
+      "row": 1,
+      "note": "Travel Y-South, row 1 goes Y+5 (North) = fold-back. 5mm < 25mm \u2192 auto-delete"
+    }
+  },
+  {
+    "id": "BM-SF-09",
+    "group": "smartfix",
+    "rule": "R-CHN-02",
+    "description": "R-CHN-02: 50mm fold-back pipe \u2014 ERROR (too large to auto-delete)",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17050,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17050,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-CHN-02",
+      "tier": 4,
+      "row": 1
+    }
+  },
+  {
+    "id": "BM-SF-10",
+    "group": "smartfix",
+    "rule": "R-CHN-03",
+    "description": "R-CHN-03: Two bends with no pipe between \u2014 WARNING",
+    "input": [
+      {
+        "type": "BEND",
+        "bore": 350,
+        "ep1": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 103827
+        },
+        "ep2": {
+          "x": 95867,
+          "y": 16586.4,
+          "z": 104360
+        },
+        "cp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 104360
+        },
+        "bp": null,
+        "branchBore": null,
+        "skey": "BEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "BEND",
+        "bore": 350,
+        "ep1": {
+          "x": 95867,
+          "y": 16586.4,
+          "z": 104360
+        },
+        "ep2": {
+          "x": 95334,
+          "y": 16586.4,
+          "z": 104360
+        },
+        "cp": {
+          "x": 95867,
+          "y": 16586.4,
+          "z": 104893
+        },
+        "bp": null,
+        "branchBore": null,
+        "skey": "BEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-CHN-03",
+      "tier": 3,
+      "row": 1
+    }
+  },
+  {
+    "id": "BM-SF-14",
+    "group": "smartfix",
+    "rule": "R-GAP-01",
+    "description": "R-GAP-01: 0.3mm micro-gap between elements \u2014 SNAP (Tier 1)",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 16999.7,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-GAP-01",
+      "tier": 1,
+      "action": "SNAP"
+    }
+  },
+  {
+    "id": "BM-SF-15",
+    "group": "smartfix",
+    "rule": "R-GAP-02",
+    "description": "R-GAP-02: 15mm axial gap along Y-South \u2014 INSERT pipe (Tier 2)",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 16985,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-GAP-02",
+      "tier": 2,
+      "action": "INSERT",
+      "insertedPipe": {
+        "ep1": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16985,
+          "z": 101968
+        },
+        "length": 15,
+        "bore": 400
+      }
+    }
+  },
+  {
+    "id": "BM-SF-22",
+    "group": "smartfix",
+    "rule": "R-OVR-01",
+    "description": "R-OVR-01: 10mm pipe-pipe overlap \u2014 TRIM (Tier 2)",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16990,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-OVR-01",
+      "tier": 2,
+      "action": "TRIM",
+      "trimAmount": 10,
+      "note": "Pipe 0 EP2.y=16990 overlaps Pipe 1 EP1.y=17000 by 10mm"
+    }
+  },
+  {
+    "id": "BM-SF-25",
+    "group": "smartfix",
+    "rule": "R-OVR-03",
+    "description": "R-OVR-03: Flange-flange overlap \u2014 ERROR (rigid-on-rigid)",
+    "input": [
+      {
+        "type": "FLANGE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17850,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "FLWN",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "FLANGE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17860,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17710,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "FLWN",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-OVR-03",
+      "tier": 4,
+      "action": "NONE",
+      "note": "10mm overlap, both rigid \u2014 cannot auto-fix"
+    }
+  },
+  {
+    "id": "BM-SF-27",
+    "group": "smartfix",
+    "rule": "R-BRN-01",
+    "description": "R-BRN-01: TEE branch bore (500) exceeds header bore (400) \u2014 ERROR",
+    "input": [
+      {
+        "type": "TEE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 16891.4,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16281.4,
+          "z": 101968
+        },
+        "cp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 101968
+        },
+        "bp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 102273
+        },
+        "branchBore": 500,
+        "skey": "TEBW",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-BRN-01",
+      "tier": 4,
+      "row": 0
+    }
+  },
+  {
+    "id": "BM-SF-32",
+    "group": "smartfix",
+    "rule": "R-TOP-02",
+    "description": "R-TOP-02: Disconnected element (>25mm from any chain) \u2014 ERROR",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 16000,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 50000,
+          "y": 50000,
+          "z": 50000
+        },
+        "ep2": {
+          "x": 50000,
+          "y": 49000,
+          "z": 50000
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "ruleId": "R-TOP-02",
+      "tier": 4,
+      "row": 2,
+      "note": "Row 2 is far from rows 0-1 \u2014 orphan"
+    }
+  },
+  {
+    "id": "BM-SF-40",
+    "group": "smartfix",
+    "rule": "R-GAP-08",
+    "description": "R-GAP-08: Verify inserted gap-fill element is PIPE, not a fitting",
+    "input": [
+      {
+        "type": "FLANGE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 18000,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17854,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "FLWN",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      },
+      {
+        "type": "FLANGE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17834,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17688,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "FLWN",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "expected": {
+      "action": "INSERT",
+      "insertedType": "PIPE",
+      "note": "20mm gap between flanges \u2014 filler must be PIPE, never FLANGE"
+    }
+  },
+  {
+    "id": "BM-PTE-01",
+    "group": "pte",
+    "rule": "R-PTE-05",
+    "description": "R-PTE-05: BRAN Pt=1 is chain start \u2014 not a physical component",
+    "input_points": [
+      {
+        "Sequence": 1,
+        "Type": "BRAN",
+        "Point": 1,
+        "PPoint": 1,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 17989.4,
+        "Up": 101968,
+        "RefNo": "=/1664",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "START",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 2,
+        "Type": "FLAN",
+        "Point": 1,
+        "PPoint": 1,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 17986.4,
+        "Up": 101968,
+        "RefNo": "=/1666",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 3,
+        "Type": "FLAN",
+        "Point": 2,
+        "PPoint": 2,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 17840.4,
+        "Up": 101968,
+        "RefNo": "=/1666",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      }
+    ],
+    "expected": {
+      "elementCount": 1,
+      "firstElementType": "FLANGE",
+      "note": "BRAN produces no element. Only the FLANGE is output."
+    }
+  },
+  {
+    "id": "BM-PTE-02",
+    "group": "pte",
+    "rule": "R-PTE-07",
+    "description": "R-PTE-07: 3mm gasket skipped (< 6mm threshold)",
+    "input_points": [
+      {
+        "Sequence": 1,
+        "Type": "GASK",
+        "Point": 1,
+        "PPoint": 1,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 17989.4,
+        "Up": 101968,
+        "RefNo": "=/1665",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 2,
+        "Type": "GASK",
+        "Point": 2,
+        "PPoint": 2,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 17986.4,
+        "Up": 101968,
+        "RefNo": "=/1665",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 3,
+        "Type": "FLAN",
+        "Point": 1,
+        "PPoint": 1,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 17986.4,
+        "Up": 101968,
+        "RefNo": "=/1666",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 4,
+        "Type": "FLAN",
+        "Point": 2,
+        "PPoint": 2,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 17840.4,
+        "Up": 101968,
+        "RefNo": "=/1666",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      }
+    ],
+    "expected": {
+      "elementCount": 1,
+      "skippedGaskets": 1,
+      "note": "Gasket length=3mm < 6mm \u2192 skipped. Only FLANGE remains."
+    }
+  },
+  {
+    "id": "BM-PTE-03",
+    "group": "pte",
+    "rule": "R-PTE-07",
+    "description": "R-PTE-07: 8mm gasket converted to short pipe (\u2265 6mm)",
+    "input_points": [
+      {
+        "Sequence": 1,
+        "Type": "GASK",
+        "Point": 1,
+        "PPoint": 1,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 17989.4,
+        "Up": 101968,
+        "RefNo": "=/X",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 2,
+        "Type": "GASK",
+        "Point": 2,
+        "PPoint": 2,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 17981.4,
+        "Up": 101968,
+        "RefNo": "=/X",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      }
+    ],
+    "expected": {
+      "elementCount": 1,
+      "firstElementType": "PIPE",
+      "length": 8.0
+    }
+  },
+  {
+    "id": "BM-PTE-04",
+    "group": "pte",
+    "rule": "R-PTE-06",
+    "description": "R-PTE-06: ANCI creates SUPPORT + implicit pipe on each side",
+    "input_points": [
+      {
+        "Sequence": 1,
+        "Type": "FLAN",
+        "Point": 2,
+        "PPoint": 2,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 17840.4,
+        "Up": 101968,
+        "RefNo": "=/1666",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 2,
+        "Type": "ANCI",
+        "Point": 0,
+        "PPoint": 0,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 17186.4,
+        "Up": 101968,
+        "RefNo": "=/2807",
+        "NodeNo": "30",
+        "NodeName": "PS00178.1",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 3,
+        "Type": "TEE",
+        "Point": 1,
+        "PPoint": 1,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 16891.4,
+        "Up": 101968,
+        "RefNo": "=/1667",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      }
+    ],
+    "expected": {
+      "elementCount": 4,
+      "elements": [
+        {
+          "type": "PIPE",
+          "length": 654.0,
+          "note": "Implicit pipe FLAN\u2192ANCI"
+        },
+        {
+          "type": "SUPPORT",
+          "supportGuid": "UCI:PS00178.1"
+        },
+        {
+          "type": "PIPE",
+          "length": 295.0,
+          "note": "Implicit pipe ANCI\u2192TEE"
+        },
+        {
+          "type": "TEE",
+          "note": "TEE EP1 (partial \u2014 needs EP2 from next row)"
+        }
+      ]
+    }
+  },
+  {
+    "id": "BM-PTE-07",
+    "group": "pte",
+    "rule": "R-PTE-02",
+    "description": "R-PTE-02: TEE with Pt=1,3,0,2 assembles into EP1/BP/CP/EP2",
+    "input_points": [
+      {
+        "Sequence": 1,
+        "Type": "TEE",
+        "Point": 1,
+        "PPoint": 1,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 16891.4,
+        "Up": 101968,
+        "RefNo": "=/1667",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 2,
+        "Type": "TEE",
+        "Point": 3,
+        "PPoint": 3,
+        "Bore": "350mm",
+        "East": 96400,
+        "North": 16586.4,
+        "Up": 102273,
+        "RefNo": "=/1667",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 3,
+        "Type": "TEE",
+        "Point": 0,
+        "PPoint": 0,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 16586.4,
+        "Up": 101968,
+        "RefNo": "=/1667",
+        "NodeNo": "40",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 4,
+        "Type": "TEE",
+        "Point": 2,
+        "PPoint": 2,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 16281.4,
+        "Up": 101968,
+        "RefNo": "=/1667",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      }
+    ],
+    "expected": {
+      "elementCount": 1,
+      "firstElementType": "TEE",
+      "ep1": {
+        "x": 96400,
+        "y": 16891.4,
+        "z": 101968
+      },
+      "ep2": {
+        "x": 96400,
+        "y": 16281.4,
+        "z": 101968
+      },
+      "cp": {
+        "x": 96400,
+        "y": 16586.4,
+        "z": 101968
+      },
+      "bp": {
+        "x": 96400,
+        "y": 16586.4,
+        "z": 102273
+      },
+      "bore": 400,
+      "branchBore": 350,
+      "cpIsMidpoint": true,
+      "brlen": 305.0
+    }
+  },
+  {
+    "id": "BM-PTE-08",
+    "group": "pte",
+    "rule": "R-PTE-20",
+    "description": "R-PTE-20: Branch BRAN starts at TEE CP (NodeNo=40 matches). BRLEN subtracted from gap.",
+    "input_points": [
+      {
+        "Sequence": 1,
+        "Type": "TEE",
+        "Point": 0,
+        "PPoint": 0,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 16586.4,
+        "Up": 101968,
+        "RefNo": "=/1667",
+        "NodeNo": "40",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 2,
+        "Type": "TEE",
+        "Point": 2,
+        "PPoint": 2,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 16281.4,
+        "Up": 101968,
+        "RefNo": "=/1667",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 3,
+        "Type": "BRAN",
+        "Point": 1,
+        "PPoint": 1,
+        "Bore": "350mm",
+        "East": 96400,
+        "North": 16586.4,
+        "Up": 101968,
+        "RefNo": "=/1151",
+        "NodeNo": "40",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 4,
+        "Type": "FLAN",
+        "Point": 1,
+        "PPoint": 2,
+        "Bore": "350mm",
+        "East": 96400,
+        "North": 16586.4,
+        "Up": 102473,
+        "RefNo": "=/1154",
+        "NodeNo": "70",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 5,
+        "Type": "FLAN",
+        "Point": 2,
+        "PPoint": 1,
+        "Bore": "350mm",
+        "East": 96400,
+        "North": 16586.4,
+        "Up": 102616,
+        "RefNo": "=/1154",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      }
+    ],
+    "expected": {
+      "branchBranMatchesTeeCP": true,
+      "rawGapBranToFlan": 505.0,
+      "teeBrlen": 305.0,
+      "truePipeLength": 200.0,
+      "implicitPipeEP1": {
+        "x": 96400,
+        "y": 16586.4,
+        "z": 102273
+      },
+      "implicitPipeEP2": {
+        "x": 96400,
+        "y": 16586.4,
+        "z": 102473
+      },
+      "note": "Raw gap 505mm includes 305mm tee body. True pipe = 505-305 = 200mm. Starts at BP not CP."
+    }
+  },
+  {
+    "id": "BM-PTE-09",
+    "group": "pte",
+    "rule": "R-PTE-21",
+    "description": "R-PTE-21: OLET EP1=EP2=CP \u2014 zero length on header",
+    "input_points": [
+      {
+        "Sequence": 1,
+        "Type": "OLET",
+        "Point": 1,
+        "PPoint": 1,
+        "Bore": "350mm",
+        "East": 96400,
+        "North": 16586.4,
+        "Up": 103677,
+        "RefNo": "=/1558",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 2,
+        "Type": "OLET",
+        "Point": 3,
+        "PPoint": 3,
+        "Bore": "50mm",
+        "East": 96400,
+        "North": 16370.5,
+        "Up": 103677,
+        "RefNo": "=/1558",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 3,
+        "Type": "OLET",
+        "Point": 0,
+        "PPoint": 0,
+        "Bore": "350mm",
+        "East": 96400,
+        "North": 16586.4,
+        "Up": 103677,
+        "RefNo": "=/1558",
+        "NodeNo": "90",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 4,
+        "Type": "OLET",
+        "Point": 2,
+        "PPoint": 2,
+        "Bore": "350mm",
+        "East": 96400,
+        "North": 16586.4,
+        "Up": 103677,
+        "RefNo": "=/1558",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      }
+    ],
+    "expected": {
+      "ep1EqualsCP": true,
+      "ep2EqualsCP": true,
+      "ep1EqualsEP2": true,
+      "cp": {
+        "x": 96400,
+        "y": 16586.4,
+        "z": 103677
+      },
+      "bp": {
+        "x": 96400,
+        "y": 16370.5,
+        "z": 103677
+      },
+      "brlen": 215.9,
+      "branchBore": 50
+    }
+  },
+  {
+    "id": "BM-PTE-11",
+    "group": "pte",
+    "rule": "R-PTE-29",
+    "description": "R-PTE-29: PCOM type maps to PIPE",
+    "input_points": [
+      {
+        "Sequence": 1,
+        "Type": "PCOM",
+        "Point": 1,
+        "PPoint": 1,
+        "Bore": "350mm",
+        "East": 95721,
+        "North": 16586.4,
+        "Up": 104360,
+        "RefNo": "=/1538",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 2,
+        "Type": "PCOM",
+        "Point": 2,
+        "PPoint": 2,
+        "Bore": "350mm",
+        "East": 95686,
+        "North": 16586.4,
+        "Up": 104360,
+        "RefNo": "=/1538",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      }
+    ],
+    "expected": {
+      "elementCount": 1,
+      "firstElementType": "PIPE",
+      "length": 35.0
+    }
+  },
+  {
+    "id": "BM-PTE-12",
+    "group": "pte",
+    "rule": "R-PTE-11",
+    "description": "R-PTE-11: Bore='400mm' \u2192 parsed as 400",
+    "input_bore": "400mm",
+    "expected": {
+      "bore_mm": 400
+    }
+  },
+  {
+    "id": "BM-PTE-13",
+    "group": "pte",
+    "rule": "R-PTE-11",
+    "description": "R-PTE-11: Bore='16in' \u2192 parsed as 406.4mm",
+    "input_bore": "16in",
+    "expected": {
+      "bore_mm": 406.4
+    }
+  },
+  {
+    "id": "BM-PTE-14",
+    "group": "pte",
+    "rule": "R-PTE-12",
+    "description": "R-PTE-12: East\u2192X, North\u2192Y, Up\u2192Z mapping",
+    "input_coords": {
+      "East": "96400.000mm",
+      "North": "17989.400mm",
+      "Up": "101968.000mm"
+    },
+    "expected": {
+      "x": 96400.0,
+      "y": 17989.4,
+      "z": 101968.0
+    }
+  },
+  {
+    "id": "BM-PTE-27",
+    "group": "pte",
+    "rule": "PPoint",
+    "description": "PPoint: Mating flange detected \u2014 PPoint inverted",
+    "input_points": [
+      {
+        "Sequence": 1,
+        "Type": "FLAN",
+        "Point": 1,
+        "PPoint": 1,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 15781.4,
+        "Up": 101968,
+        "RefNo": "=/1668",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 2,
+        "Type": "FLAN",
+        "Point": 2,
+        "PPoint": 2,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 15635.4,
+        "Up": 101968,
+        "RefNo": "=/1668",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 3,
+        "Type": "GASK",
+        "Point": 1,
+        "PPoint": 1,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 15635.4,
+        "Up": 101968,
+        "RefNo": "=/1669",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 4,
+        "Type": "GASK",
+        "Point": 2,
+        "PPoint": 2,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 15632.4,
+        "Up": 101968,
+        "RefNo": "=/1669",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 5,
+        "Type": "FLAN",
+        "Point": 1,
+        "PPoint": 1,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 15632.4,
+        "Up": 101968,
+        "RefNo": "=/1670",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 6,
+        "Type": "FLAN",
+        "Point": 2,
+        "PPoint": 2,
+        "Bore": "400mm",
+        "East": 96400,
+        "North": 15486.4,
+        "Up": 101968,
+        "RefNo": "=/1670",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      }
+    ],
+    "expected": {
+      "flanges": [
+        {
+          "refNo": "=/1668",
+          "pt1_ppt": 1,
+          "pt2_ppt": 2,
+          "note": "Normal orientation"
+        },
+        {
+          "refNo": "=/1670",
+          "pt1_ppt": 1,
+          "pt2_ppt": 2,
+          "note": "Normal orientation"
+        }
+      ],
+      "note": "In original data, /1668 had Pt=1,PPt=2 (inverted). Detection depends on context."
+    }
+  },
+  {
+    "id": "BM-PTE-30",
+    "group": "pte",
+    "rule": "BEND CP",
+    "description": "BEND CP: 90\u00b0 bend from Z-Up to X-West \u2014 CP at corner intersection",
+    "input_points": [
+      {
+        "Sequence": 1,
+        "Type": "ELBO",
+        "Point": 1,
+        "PPoint": 1,
+        "Bore": "350mm",
+        "East": 96400,
+        "North": 16586.4,
+        "Up": 103827,
+        "RefNo": "=/1164",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 2,
+        "Type": "ELBO",
+        "Point": 0,
+        "PPoint": 0,
+        "Bore": "350mm",
+        "East": 96400,
+        "North": 16586.4,
+        "Up": 104360,
+        "RefNo": "=/1164",
+        "NodeNo": "100",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      },
+      {
+        "Sequence": 3,
+        "Type": "ELBO",
+        "Point": 2,
+        "PPoint": 2,
+        "Bore": "350mm",
+        "East": 95867,
+        "North": 16586.4,
+        "Up": 104360,
+        "RefNo": "=/1164",
+        "NodeNo": "",
+        "NodeName": "",
+        "componentName": "unset",
+        "Status": "",
+        "Restraint Type": "",
+        "Restraint Friction": "",
+        "Restraint Gap": ""
+      }
+    ],
+    "expected": {
+      "cp": {
+        "x": 96400,
+        "y": 16586.4,
+        "z": 104360
+      },
+      "distCpEp1": 533.0,
+      "distCpEp2": 533.0,
+      "equidistant": true,
+      "note": "CP shares X with EP1 and Z with EP2 (90\u00b0 bend corner rule)"
+    }
+  },
+  {
+    "id": "BM-PCF-01",
+    "group": "pcf_gen",
+    "rule": "PCF-GEN",
+    "description": "PCF output: Single PIPE element with correct format",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17840.4,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17186.4,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {
+          "1": "700 KPA",
+          "3": "A106-B",
+          "97": "=TEST/001",
+          "98": "1"
+        },
+        "text": ""
+      }
+    ],
+    "config": {
+      "decimals": 4
+    },
+    "expected": {
+      "pcf_contains": [
+        "MESSAGE-SQUARE",
+        "PIPE, A106-B,",
+        "PIPE",
+        "    END-POINT    96400.0000 17840.4000 101968.0000 400.0000",
+        "    END-POINT    96400.0000 17186.4000 101968.0000 400.0000",
+        "    COMPONENT-ATTRIBUTE1    700 KPA",
+        "    COMPONENT-ATTRIBUTE3    A106-B"
+      ],
+      "pcf_not_contains": [
+        "SKEY",
+        "COMPONENT-ATTRIBUTE8"
+      ],
+      "line_ending": "CRLF"
+    }
+  },
+  {
+    "id": "BM-PCF-02",
+    "group": "pcf_gen",
+    "rule": "PCF-GEN",
+    "description": "PCF output: FLANGE with <SKEY> (angle brackets)",
+    "input": [
+      {
+        "type": "FLANGE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17986.4,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17840.4,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "FLWN",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {
+          "1": "700 KPA",
+          "3": "A106-B",
+          "8": "100 KG",
+          "97": "=TEST/002",
+          "98": "2"
+        },
+        "text": ""
+      }
+    ],
+    "config": {
+      "decimals": 4
+    },
+    "expected": {
+      "pcf_contains": [
+        "FLANGE",
+        "    <SKEY>  FLWN",
+        "    COMPONENT-ATTRIBUTE8    100 KG"
+      ],
+      "pcf_not_contains": [
+        "    SKEY  FLWN"
+      ]
+    }
+  },
+  {
+    "id": "BM-PCF-03",
+    "group": "pcf_gen",
+    "rule": "PCF-GEN",
+    "description": "PCF output: SUPPORT with CO-ORDS bore=0, no CAs, UCI: prefix",
+    "input": [
+      {
+        "type": "SUPPORT",
+        "bore": 0,
+        "ep1": null,
+        "ep2": null,
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": {
+          "x": 96400,
+          "y": 17186.4,
+          "z": 101968
+        },
+        "supportName": "CA150",
+        "supportGuid": "UCI:PS00178.1",
+        "ca": {},
+        "text": "SUPPORT, RefNo:=TEST/003, SeqNo:3, CA150, UCI:PS00178.1"
+      }
+    ],
+    "config": {
+      "decimals": 4
+    },
+    "expected": {
+      "pcf_contains": [
+        "MESSAGE-SQUARE",
+        "    SUPPORT, RefNo:=TEST/003",
+        "SUPPORT",
+        "    CO-ORDS    96400.0000 17186.4000 101968.0000 0.0000",
+        "    <SUPPORT_NAME>    CA150",
+        "    <SUPPORT_GUID>    UCI:PS00178.1"
+      ],
+      "pcf_not_contains": [
+        "COMPONENT-ATTRIBUTE",
+        "END-POINT"
+      ]
+    }
+  },
+  {
+    "id": "BM-PCF-05",
+    "group": "pcf_gen",
+    "rule": "PCF-GEN",
+    "description": "PCF output: OLET with only CP+BP, no END-POINTs",
+    "input": [
+      {
+        "type": "OLET",
+        "bore": 350,
+        "ep1": null,
+        "ep2": null,
+        "cp": {
+          "x": 96400,
+          "y": 16586.4,
+          "z": 103677
+        },
+        "bp": {
+          "x": 96400,
+          "y": 16370.5,
+          "z": 103677
+        },
+        "branchBore": 50,
+        "skey": "OLWL",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {
+          "1": "700 KPA",
+          "97": "=TEST/005",
+          "98": "5"
+        },
+        "text": ""
+      }
+    ],
+    "config": {
+      "decimals": 4
+    },
+    "expected": {
+      "pcf_contains": [
+        "OLET",
+        "    CENTRE-POINT",
+        "    BRANCH1-POINT",
+        "    <SKEY>  OLWL"
+      ],
+      "pcf_not_contains": [
+        "END-POINT"
+      ]
+    }
+  },
+  {
+    "id": "BM-PCF-07",
+    "group": "pcf_gen",
+    "rule": "V2",
+    "description": "PCF output: All coords AND bore at 4-decimal",
+    "input": [
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17840.4,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17186.4,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {},
+        "text": ""
+      }
+    ],
+    "config": {
+      "decimals": 4
+    },
+    "expected": {
+      "pcf_contains": [
+        "96400.0000 17840.4000 101968.0000 400.0000"
+      ],
+      "pcf_not_contains": [
+        " 400\n",
+        " 400\r\n"
+      ]
+    }
+  },
+  {
+    "id": "BM-PCF-12",
+    "group": "pcf_gen",
+    "rule": "ROUND-TRIP",
+    "description": "Round-trip: Export PCF \u2192 re-import \u2192 compare Data Table",
+    "input": [
+      {
+        "type": "FLANGE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17986.4,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17840.4,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "FLWN",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {
+          "1": "700 KPA",
+          "3": "A106-B",
+          "8": "100 KG",
+          "97": "=RT/001",
+          "98": "1"
+        },
+        "text": ""
+      },
+      {
+        "type": "PIPE",
+        "bore": 400,
+        "ep1": {
+          "x": 96400,
+          "y": 17840.4,
+          "z": 101968
+        },
+        "ep2": {
+          "x": 96400,
+          "y": 17186.4,
+          "z": 101968
+        },
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": null,
+        "supportName": "",
+        "supportGuid": "",
+        "ca": {
+          "1": "700 KPA",
+          "3": "A106-B",
+          "97": "=RT/002",
+          "98": "2"
+        },
+        "text": ""
+      },
+      {
+        "type": "SUPPORT",
+        "bore": 0,
+        "ep1": null,
+        "ep2": null,
+        "cp": null,
+        "bp": null,
+        "branchBore": null,
+        "skey": "",
+        "supportCoor": {
+          "x": 96400,
+          "y": 17186.4,
+          "z": 101968
+        },
+        "supportName": "ANC",
+        "supportGuid": "UCI:PS001",
+        "ca": {},
+        "text": "SUPPORT, RefNo:=RT/003, SeqNo:3, ANC, UCI:PS001"
+      }
+    ],
+    "expected": {
+      "roundTripMatch": true,
+      "note": "Export to PCF, re-parse PCF, compare: types match, coords match within 0.1mm, CAs match"
+    }
+  }
+]
