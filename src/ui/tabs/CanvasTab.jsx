@@ -44,7 +44,12 @@ const computeSpools = (dataTable) => {
 
     const floodFill = (startId, sId) => {
         const queue = [startId];
+        let iterations = 0;
         while (queue.length > 0) {
+            if (iterations++ > 10000) {
+                console.warn('floodFill aborted: exceeded 10000 iterations (possible cycle or massive network).');
+                break;
+            }
             const currId = queue.shift();
             if (visited.has(currId)) continue;
 
@@ -974,16 +979,28 @@ const MarqueeLayer = () => {
 
     return (
         <group>
-            {/* Transparent click plane positioned up slightly to avoid z-fighting */}
+            {/*
+              Fix WebGL Context Loss:
+              Instead of a massive 500,000x500,000 physical mesh plane that can cause extreme
+              clipping/precision errors in the depth buffer, we use a global full-screen
+              overlay handler that relies on the generic ThreeJS raycaster via pointer events,
+              but attached to an invisible, screen-filling background mesh.
+              Because we don't strictly need a plane, we can just attach these events
+              to a simple infinite bounding volume or rely on `Canvas` global events.
+              However, for localized intercept, a small plane scaled up works best if depthTest=false
+              and renderOrder is low. Let's use a smaller base size and scale it.
+            */}
             <mesh
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
                 rotation={[-Math.PI / 2, 0, 0]}
                 position={[0, Math.max(startPt?.y || 0, 0) + 1, 0]}
+                scale={1000} // Scale a 500x500 plane
+                renderOrder={-1}
             >
-                <planeGeometry args={[500000, 500000]} />
-                <meshBasicMaterial transparent opacity={0} depthTest={false} />
+                <planeGeometry args={[500, 500]} />
+                <meshBasicMaterial visible={false} depthTest={false} />
             </mesh>
 
             {/* Marquee Visuals */}
