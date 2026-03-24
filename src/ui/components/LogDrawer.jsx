@@ -36,7 +36,7 @@ export const LogDrawer = () => {
       >
         <div className="flex items-center gap-2">
           <span className="text-slate-300 font-medium text-xs tracking-wider uppercase">
-            {isExpanded ? '▼' : '▲'} Log
+            {isExpanded ? '▼' : '▲'} 3D Topo Log
           </span>
           <span className="bg-slate-700 text-slate-200 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
             {(state.log || []).length}

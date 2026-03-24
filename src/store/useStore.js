@@ -101,6 +101,10 @@ export const useStore = create((set, get) => ({
   }),
   clearMeasure: () => set({ measurePts: [] }),
 
+  // Global snapping state
+  cursorSnapPoint: null,
+  setCursorSnapPoint: (pt) => set({ cursorSnapPoint: pt }),
+
   // Highlighting/Interaction state for the canvas
   selectedElementId: null,
   hoveredElementId: null,
@@ -119,7 +123,8 @@ export const useStore = create((set, get) => ({
   getPipes: () => get().dataTable.filter(r => (r.type || "").toUpperCase() === 'PIPE'),
 
   // A helper method that safely retrieves all non-PIPE components for distinct 3D rendering
-  getImmutables: () => get().dataTable.filter(r => (r.type || "").toUpperCase() !== 'PIPE' && (r.type || "").toUpperCase() !== 'SUPPORT'),
+  // Note: We now include SUPPORT components in immutables so they render visibly.
+  getImmutables: () => get().dataTable.filter(r => (r.type || "").toUpperCase() !== 'PIPE'),
 
   // All draggable components (pipes + fittings, excluding SUPPORT)
   getAllDraggable: () => get().dataTable.filter(r => (r.type || "").toUpperCase() !== 'SUPPORT'),

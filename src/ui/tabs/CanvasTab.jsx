@@ -95,7 +95,8 @@ const InstancedPipes = () => {
 
               useStore.getState().setSelected(pipe._rowIndex);
 
-              window.dispatchEvent(new CustomEvent('canvas-focus-point', { detail: { x: midX, y: midY, z: midZ, dist: distance } }));
+              // Do not dispatch canvas-focus-point automatically anymore.
+              // Instead, we just set the selection for the property panel.
           }
       }
   };
@@ -152,10 +153,15 @@ const ImmutableComponents = () => {
         const color = typeColor(el.type);
         const type = (el.type || '').toUpperCase();
 
+        const handleSelect = (e) => {
+          e.stopPropagation();
+          useStore.getState().setSelected(el._rowIndex);
+        };
+
         if (type === 'FLANGE') {
           // Disc — short, wide cylinder
           return (
-            <mesh key={`fl-${i}`} position={mid} quaternion={quat}>
+            <mesh key={`fl-${i}`} position={mid} quaternion={quat} onPointerDown={handleSelect}>
               <cylinderGeometry args={[r * 1.6, r * 1.6, Math.max(dist * 0.15, 10), 24]} />
               <meshStandardMaterial color={color} />
             </mesh>
@@ -165,7 +171,7 @@ const ImmutableComponents = () => {
         if (type === 'VALVE') {
           // Box body
           return (
-            <mesh key={`vv-${i}`} position={mid} quaternion={quat}>
+            <mesh key={`vv-${i}`} position={mid} quaternion={quat} onPointerDown={handleSelect}>
               <boxGeometry args={[r * 2.2, dist, r * 2.2]} />
               <meshStandardMaterial color={color} />
             </mesh>
@@ -175,7 +181,7 @@ const ImmutableComponents = () => {
         if (type === 'BEND') {
           // Slightly thicker cylinder in amber — no torus without 3 points; keep cylinder with distinct colour
           return (
-            <mesh key={`bn-${i}`} position={mid} quaternion={quat}>
+            <mesh key={`bn-${i}`} position={mid} quaternion={quat} onPointerDown={handleSelect}>
               <cylinderGeometry args={[r * 1.1, r * 1.1, dist, 16]} />
               <meshStandardMaterial color={color} />
             </mesh>
@@ -200,7 +206,7 @@ const ImmutableComponents = () => {
           const branchQuat = new THREE.Quaternion().setFromUnitVectors(up, branchDir);
           const branchR = el.branchBore ? el.branchBore / 2 : r * 0.6;
           return (
-            <group key={`tee-${i}`}>
+            <group key={`tee-${i}`} onPointerDown={handleSelect}>
               <mesh position={mid} quaternion={quat}>
                 <cylinderGeometry args={[r, r, dist, 16]} />
                 <meshStandardMaterial color={color} />
@@ -219,16 +225,29 @@ const ImmutableComponents = () => {
             ? [el.cp.x, el.cp.y, el.cp.z]
             : [mid.x, mid.y, mid.z];
           return (
-            <mesh key={`ol-${i}`} position={pos}>
+            <mesh key={`ol-${i}`} position={pos} onPointerDown={handleSelect}>
               <sphereGeometry args={[r * 1.3, 12, 12]} />
               <meshStandardMaterial color={color} />
             </mesh>
           );
         }
 
+        if (type === 'SUPPORT') {
+          // A visible structural stub (often vertical to a beam)
+          // Renders a box at midpoint extending to ep2 (usually the structural attachment point)
+          // Actually, support is often just ep1 (attachment) and ep2 (beam).
+          return (
+            <mesh key={`supp-${i}`} position={mid} quaternion={quat} onPointerDown={handleSelect}>
+              {/* Thin, distinct square profile instead of cylinder */}
+              <boxGeometry args={[r * 1.5, dist, r * 1.5]} />
+              <meshStandardMaterial color="#94a3b8" />
+            </mesh>
+          );
+        }
+
         // Fallback: generic cylinder
         return (
-          <mesh key={`im-${i}`} position={mid} quaternion={quat}>
+          <mesh key={`im-${i}`} position={mid} quaternion={quat} onPointerDown={handleSelect}>
             <cylinderGeometry args={[r, r, dist, 16]} />
             <meshStandardMaterial color={color} />
           </mesh>
@@ -703,18 +722,93 @@ const SingleIssuePanel = ({ proposals, validationIssues, currentIssueIndex, setC
 };
 
 // ----------------------------------------------------
+// Global Snap Layer
+// Provides a unified snapping point for Measure, Break, etc.
+// ----------------------------------------------------
+const GlobalSnapLayer = () => {
+    const canvasMode = useStore(state => state.canvasMode);
+    const dataTable = useStore(state => state.dataTable);
+    const setCursorSnapPoint = useStore(state => state.setCursorSnapPoint);
+    const cursorSnapPoint = useStore(state => state.cursorSnapPoint);
+
+    // Only active during tools that need picking
+    const isActive = ['MEASURE', 'BREAK', 'CONNECT', 'INSERT_SUPPORT'].includes(canvasMode);
+
+    useEffect(() => {
+        if (!isActive) {
+            setCursorSnapPoint(null);
+        }
+    }, [isActive, setCursorSnapPoint]);
+
+    if (!isActive) return null;
+
+    const snapRadius = 50; // mm
+
+    const handlePointerMove = (e) => {
+        let nearest = null;
+        let minDist = snapRadius;
+
+        // Find closest ep1, ep2, or midpoint
+        dataTable.forEach(row => {
+            const ptsToTest = [];
+            if (row.ep1) ptsToTest.push(new THREE.Vector3(row.ep1.x, row.ep1.y, row.ep1.z));
+            if (row.ep2) ptsToTest.push(new THREE.Vector3(row.ep2.x, row.ep2.y, row.ep2.z));
+            if (row.ep1 && row.ep2) {
+                const mid = new THREE.Vector3(row.ep1.x, row.ep1.y, row.ep1.z)
+                    .lerp(new THREE.Vector3(row.ep2.x, row.ep2.y, row.ep2.z), 0.5);
+                ptsToTest.push(mid);
+            }
+
+            ptsToTest.forEach(pt => {
+                const dist = pt.distanceTo(e.point);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = pt;
+                }
+            });
+        });
+
+        if (nearest) {
+            // Update state ONLY if point changed to avoid re-renders
+            if (!cursorSnapPoint || cursorSnapPoint.distanceTo(nearest) > 0.1) {
+                setCursorSnapPoint(nearest);
+            }
+        } else if (cursorSnapPoint) {
+            setCursorSnapPoint(null);
+        }
+    };
+
+    return (
+        <group onPointerMove={handlePointerMove}>
+            {/* Click plane for generic move events */}
+            <mesh visible={false}>
+                <planeGeometry args={[200000, 200000]} />
+            </mesh>
+
+            {cursorSnapPoint && (
+                <mesh position={cursorSnapPoint} renderOrder={999}>
+                    <sphereGeometry args={[15, 16, 16]} />
+                    <meshBasicMaterial color="#eab308" transparent opacity={0.8} depthTest={false} />
+                </mesh>
+            )}
+        </group>
+    );
+};
+
+// ----------------------------------------------------
 // Measure Tool
 // ----------------------------------------------------
 const MeasureTool = () => {
     const measurePts = useStore(state => state.measurePts);
     const addMeasurePt = useStore(state => state.addMeasurePt);
     const canvasMode = useStore(state => state.canvasMode);
+    const cursorSnapPoint = useStore(state => state.cursorSnapPoint);
 
     if (canvasMode !== 'MEASURE') return null;
 
     const handlePointerDown = (e) => {
         e.stopPropagation();
-        addMeasurePt(e.point.clone());
+        addMeasurePt(cursorSnapPoint ? cursorSnapPoint.clone() : e.point.clone());
     };
 
     return (
@@ -787,6 +881,8 @@ const BreakPipeLayer = () => {
         }
     };
 
+    const cursorSnapPoint = useStore(state => state.cursorSnapPoint);
+
     const handlePointerDown = (e, pipeRow) => {
         e.stopPropagation();
 
@@ -795,7 +891,8 @@ const BreakPipeLayer = () => {
 
             pushHistory('Break Pipe');
 
-            const breakResults = breakPipeAtPoint(pipeRow, e.point);
+            const breakPt = cursorSnapPoint ? cursorSnapPoint.clone() : e.point.clone();
+            const breakResults = breakPipeAtPoint(pipeRow, breakPt);
 
             if (breakResults) {
                 const [rowA, rowB] = breakResults;
@@ -813,7 +910,7 @@ const BreakPipeLayer = () => {
 
                 useStore.getState().setDataTable(updatedTable);
 
-                dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Applied/Fix", message: `Row ${pipeRow._rowIndex} broken at (${e.point.x.toFixed(1)}, ${e.point.y.toFixed(1)}, ${e.point.z.toFixed(1)}).` } });
+                dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Applied/Fix", message: `Row ${pipeRow._rowIndex} broken at (${breakPt.x.toFixed(1)}, ${breakPt.y.toFixed(1)}, ${breakPt.z.toFixed(1)}).` } });
 
                 // One-shot action
                 useStore.getState().setCanvasMode('VIEW');
@@ -863,115 +960,9 @@ const BreakPipeLayer = () => {
 // Endpoint Snap Layer
 // ----------------------------------------------------
 const EndpointSnapLayer = () => {
-    const canvasMode = useStore(state => state.canvasMode);
-    const dataTable = useStore(state => state.dataTable);
-    const pushHistory = useStore(state => state.pushHistory);
-    const { dispatch } = useAppContext();
-    const { camera } = useThree();
-
-    const [draft, setDraft] = useState(null);
-    const [cursorPos, setCursorPos] = useState(null);
-    const [hoveredEP, setHoveredEP] = useState(null);
-
-    if (canvasMode !== 'CONNECT') return null;
-
-    const snapRadius = 50; // mm
-
-    const handlePointerMove = (e) => {
-        setCursorPos(e.point);
-
-        let nearest = null;
-        let minDist = snapRadius;
-
-        dataTable.forEach(row => {
-            ['ep1', 'ep2'].forEach(epKey => {
-                if (row[epKey]) {
-                    const pt = new THREE.Vector3(row[epKey].x, row[epKey].y, row[epKey].z);
-                    const dist = pt.distanceTo(e.point);
-                    if (dist < minDist) {
-                        minDist = dist;
-                        nearest = { row, epKey, position: pt };
-                    }
-                }
-            });
-        });
-
-        setHoveredEP(nearest);
-    };
-
-    const handlePointerDown = (e) => {
-        e.stopPropagation();
-        if (hoveredEP) {
-            setDraft({
-                fromElement: hoveredEP.row,
-                fromEPKey: hoveredEP.epKey,
-                fromPosition: hoveredEP.position
-            });
-        }
-    };
-
-    const handlePointerUp = (e) => {
-        if (draft && hoveredEP && draft.fromElement._rowIndex !== hoveredEP.row._rowIndex) {
-            // Commit Snap
-            pushHistory('Snap Connect');
-
-            const delta = hoveredEP.position.clone().sub(draft.fromPosition);
-
-            const coords = { [draft.fromEPKey]: { x: hoveredEP.position.x, y: hoveredEP.position.y, z: hoveredEP.position.z } };
-
-            dispatch({
-                type: 'UPDATE_STAGE2_ROW_COORDS',
-                payload: { rowIndex: draft.fromElement._rowIndex, coords }
-            });
-
-            const updatedTable = dataTable.map(r =>
-                r._rowIndex === draft.fromElement._rowIndex ? { ...r, ...coords } : r
-            );
-            useStore.getState().setDataTable(updatedTable);
-
-            dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Applied/Fix", message: `Snapped Row ${draft.fromElement._rowIndex} ${draft.fromEPKey} to Row ${hoveredEP.row._rowIndex} ${hoveredEP.epKey}.` } });
-        }
-        setDraft(null);
-    };
-
-    return (
-        <group onPointerMove={handlePointerMove} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp}>
-            {/* Click plane for move/up events when off geometry */}
-            <mesh>
-                <planeGeometry args={[200000, 200000]} />
-                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-            </mesh>
-
-            {/* Snap Targets */}
-            {dataTable.map((row, i) => (
-                <React.Fragment key={`snap-${i}`}>
-                    {row.ep1 && (
-                        <mesh position={[row.ep1.x, row.ep1.y, row.ep1.z]}>
-                            <sphereGeometry args={[20, 8, 8]} />
-                            <meshBasicMaterial color="#eab308" transparent opacity={0.6} />
-                        </mesh>
-                    )}
-                    {row.ep2 && (
-                        <mesh position={[row.ep2.x, row.ep2.y, row.ep2.z]}>
-                            <sphereGeometry args={[20, 8, 8]} />
-                            <meshBasicMaterial color="#eab308" transparent opacity={0.6} />
-                        </mesh>
-                    )}
-                </React.Fragment>
-            ))}
-
-            {hoveredEP && (
-                <mesh position={hoveredEP.position}>
-                    <sphereGeometry args={[25, 16, 16]} />
-                    <meshBasicMaterial color="#ffffff" wireframe />
-                </mesh>
-            )}
-
-            {draft && cursorPos && (
-                <Line points={[draft.fromPosition, cursorPos]} color="#eab308" lineWidth={3} dashed dashSize={20} gapSize={10} />
-            )}
-        </group>
-    );
+    // Legacy snap connection logic removed;
+    // We already have generic Drag editing and global Object Snaps.
+    return null;
 };
 
 // ----------------------------------------------------
@@ -1072,6 +1063,8 @@ const InsertSupportLayer = () => {
         if (e.point) setHoverPos(e.point);
     };
 
+    const cursorSnapPoint = useStore(state => state.cursorSnapPoint);
+
     const handlePointerDown = (e, pipeRow) => {
         e.stopPropagation();
 
@@ -1079,7 +1072,8 @@ const InsertSupportLayer = () => {
 
             pushHistory('Insert Support');
 
-            const supportRow = insertSupportAtPipe(pipeRow, e.point);
+            const insertPt = cursorSnapPoint ? cursorSnapPoint.clone() : e.point.clone();
+            const supportRow = insertSupportAtPipe(pipeRow, insertPt);
 
             if (supportRow) {
                 // Determine new index and update
@@ -1670,6 +1664,7 @@ export function CanvasTab() {
 
         <EndpointSnapLayer />
         <GapRadarLayer />
+        <GlobalSnapLayer />
         <MeasureTool />
         <BreakPipeLayer />
         <InsertSupportLayer />

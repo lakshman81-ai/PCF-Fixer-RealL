@@ -84,6 +84,38 @@ export const SideInspector = () => {
     // Optional: toast here
   };
 
+  const handleZoomToSelection = () => {
+    if (!formData) return;
+    const { ep1, ep2 } = formData;
+
+    // Fallback if no EPs
+    if (!ep1 && !ep2) return;
+
+    let midX, midY, midZ, distance;
+
+    if (ep1 && ep2) {
+        midX = (ep1.x + ep2.x) / 2;
+        midY = (ep1.y + ep2.y) / 2;
+        midZ = (ep1.z + ep2.z) / 2;
+
+        const dx = ep1.x - ep2.x;
+        const dy = ep1.y - ep2.y;
+        const dz = ep1.z - ep2.z;
+        distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+    } else {
+        const pt = ep1 || ep2;
+        midX = pt.x;
+        midY = pt.y;
+        midZ = pt.z;
+        distance = 1000;
+    }
+
+    // Prevent zero distance causing issues
+    if (distance < 500) distance = 1000;
+
+    window.dispatchEvent(new CustomEvent('canvas-focus-point', { detail: { x: midX, y: midY, z: midZ, dist: distance } }));
+  };
+
   if (!selectedElementId || !formData) return null;
 
   return (
@@ -101,6 +133,16 @@ export const SideInspector = () => {
 
       {/* Body */}
       <div className="p-4 flex-1 overflow-y-auto space-y-4">
+
+        {/* Actions */}
+        <div className="flex justify-between gap-2">
+            <button
+                onClick={handleZoomToSelection}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs py-1.5 rounded transition"
+            >
+                🔍 Zoom to Selection
+            </button>
+        </div>
 
         {/* Endpoints */}
         <div className="space-y-2">

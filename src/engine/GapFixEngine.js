@@ -53,6 +53,10 @@ export const fix6mmGaps = (dataTable) => {
   // IMPROVEMENT: A second pass could catch cascading gaps if A pulled B away from C.
   // For now, sequentially iterating fixes current local pairs accurately.
 
+  if (fixLog.length === 0) {
+      fixLog.push({ type: 'Info', stage: 'GAP_FIX_6MM', message: 'No gaps ≤ 6mm found.' });
+  }
+
   return { updatedTable, fixLog };
 };
 
@@ -97,6 +101,10 @@ export const fix25mmGapsWithPipe = (dataTable, refPrefix = 'GAPFIX') => {
   // IMPROVEMENT: Warn if too many gap pipes inserted.
   if (insertCount > 5) {
       fixLog.push({ type: 'Warning', stage: 'GAP_FIX_25MM', message: `Inserted ${insertCount} gap pipes. May indicate underlying data quality issues.` });
+  }
+
+  if (insertCount === 0) {
+      fixLog.push({ type: 'Info', stage: 'GAP_FIX_25MM', message: 'No gaps 6-25mm found.' });
   }
 
   // Re-index
