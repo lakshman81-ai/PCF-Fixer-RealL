@@ -34,7 +34,7 @@ export const useStore = create((set, get) => ({
   }),
 
   // Canvas Mode Machine
-  canvasMode: 'VIEW', // 'VIEW' | 'CONNECT' | 'BREAK' | 'INSERT_SUPPORT' | 'MEASURE'
+  canvasMode: 'VIEW', // 'VIEW' | 'CONNECT' | 'BREAK' | 'INSERT_SUPPORT' | 'MEASURE' | 'MARQUEE_SELECT' | 'MARQUEE_ZOOM'
   setCanvasMode: (mode) => set({ canvasMode: mode }),
 
   // Undo Stack
@@ -71,6 +71,25 @@ export const useStore = create((set, get) => ({
   }),
 
   // Selection & Toggles
+  orthoMode: false,
+  toggleOrthoMode: () => set((state) => ({ orthoMode: !state.orthoMode })),
+
+  hiddenElementIds: [],
+  setHiddenElementIds: (ids) => set({ hiddenElementIds: ids }),
+  hideSelected: () => set((state) => ({
+    hiddenElementIds: [...new Set([...state.hiddenElementIds, ...state.multiSelectedIds])],
+    multiSelectedIds: []
+  })),
+  isolateSelected: () => set((state) => {
+    const allIds = state.dataTable.map(r => r._rowIndex);
+    const toHide = allIds.filter(id => !state.multiSelectedIds.includes(id));
+    return { hiddenElementIds: toHide };
+  }),
+  unhideAll: () => set({ hiddenElementIds: [] }),
+
+  colorMode: 'TYPE', // 'TYPE' | 'SPOOL'
+  setColorMode: (mode) => set({ colorMode: mode }),
+
   multiSelectedIds: [],
   toggleMultiSelect: (id) => set((state) => {
     const isSelected = state.multiSelectedIds.includes(id);
@@ -80,6 +99,7 @@ export const useStore = create((set, get) => ({
       return { multiSelectedIds: [...state.multiSelectedIds, id] };
     }
   }),
+  setMultiSelect: (ids) => set({ multiSelectedIds: ids }),
   clearMultiSelect: () => set({ multiSelectedIds: [] }),
   deleteElements: (ids) => set((state) => {
     const updatedTable = state.dataTable.filter(r => !ids.includes(r._rowIndex));
@@ -120,12 +140,21 @@ export const useStore = create((set, get) => ({
   setHovered: (id) => set({ hoveredElementId: id }),
 
   // A helper method that safely retrieves pipes only
-  getPipes: () => get().dataTable.filter(r => (r.type || "").toUpperCase() === 'PIPE'),
+  getPipes: () => {
+    const s = get();
+    return s.dataTable.filter(r => (r.type || "").toUpperCase() === 'PIPE' && !s.hiddenElementIds.includes(r._rowIndex));
+  },
 
   // A helper method that safely retrieves all non-PIPE components for distinct 3D rendering
   // Note: We now include SUPPORT components in immutables so they render visibly.
-  getImmutables: () => get().dataTable.filter(r => (r.type || "").toUpperCase() !== 'PIPE'),
+  getImmutables: () => {
+    const s = get();
+    return s.dataTable.filter(r => (r.type || "").toUpperCase() !== 'PIPE' && !s.hiddenElementIds.includes(r._rowIndex));
+  },
 
   // All draggable components (pipes + fittings, excluding SUPPORT)
-  getAllDraggable: () => get().dataTable.filter(r => (r.type || "").toUpperCase() !== 'SUPPORT'),
+  getAllDraggable: () => {
+    const s = get();
+    return s.dataTable.filter(r => (r.type || "").toUpperCase() !== 'SUPPORT' && !s.hiddenElementIds.includes(r._rowIndex));
+  },
 }));

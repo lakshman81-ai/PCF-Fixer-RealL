@@ -26,15 +26,92 @@ const TYPE_CONFIG = {
 };
 const typeColor = (type) => (TYPE_CONFIG[(type||'').toUpperCase()] || { color: '#64748b' }).color;
 
+// Spool logic
+const computeSpools = (dataTable) => {
+    const spools = {}; // rowIndex -> spoolId
+    let spoolCounter = 1;
+
+    // Adjacency map
+    const endpoints = {}; // "x,y,z" -> [rowIndex]
+    dataTable.forEach(r => {
+        if ((r.type||'').toUpperCase() === 'SUPPORT') return; // Supports don't route spools
+        if (r.ep1) { const key = `${parseFloat(r.ep1.x).toFixed(1)},${parseFloat(r.ep1.y).toFixed(1)},${parseFloat(r.ep1.z).toFixed(1)}`; if (!endpoints[key]) endpoints[key] = []; endpoints[key].push(r._rowIndex); }
+        if (r.ep2) { const key = `${parseFloat(r.ep2.x).toFixed(1)},${parseFloat(r.ep2.y).toFixed(1)},${parseFloat(r.ep2.z).toFixed(1)}`; if (!endpoints[key]) endpoints[key] = []; endpoints[key].push(r._rowIndex); }
+    });
+
+    const visited = new Set();
+    const rows = new Map(dataTable.map(r => [r._rowIndex, r]));
+
+    const floodFill = (startId, sId) => {
+        const queue = [startId];
+        while (queue.length > 0) {
+            const currId = queue.shift();
+            if (visited.has(currId)) continue;
+
+            const curr = rows.get(currId);
+            if (!curr) continue;
+
+            visited.add(currId);
+            spools[currId] = sId;
+
+            // Stop spool flood across flanges, valves, or pipeline ref changes
+            const currType = (curr.type || '').toUpperCase();
+            if (currType === 'FLANGE' || currType === 'VALVE' || currType === 'SUPPORT') continue;
+
+            const neighbors = new Set();
+            if (curr.ep1) { const key = `${parseFloat(curr.ep1.x).toFixed(1)},${parseFloat(curr.ep1.y).toFixed(1)},${parseFloat(curr.ep1.z).toFixed(1)}`; (endpoints[key] || []).forEach(n => neighbors.add(n)); }
+            if (curr.ep2) { const key = `${parseFloat(curr.ep2.x).toFixed(1)},${parseFloat(curr.ep2.y).toFixed(1)},${parseFloat(curr.ep2.z).toFixed(1)}`; (endpoints[key] || []).forEach(n => neighbors.add(n)); }
+
+            neighbors.forEach(nId => {
+                if (!visited.has(nId) && nId !== currId) {
+                    const neighbor = rows.get(nId);
+                    if (neighbor) {
+                        const nType = (neighbor.type || '').toUpperCase();
+                        // Only flood into pipes, bends, tees, olets. We stop *after* hitting a flange/valve, but do we include the flange?
+                        // Yes, the first flange belongs to the spool. But we don't route *past* it.
+                        // So if neighbor is flange/valve, we add it, but its own floodFill loop will terminate immediately (see `if currType === FLANGE continue` above).
+
+                        // We also break if pipeline refs differ (assuming both exist)
+                        if (curr.pipelineRef && neighbor.pipelineRef && curr.pipelineRef !== neighbor.pipelineRef) return;
+
+                        queue.push(nId);
+                    }
+                }
+            });
+        }
+    };
+
+    dataTable.forEach(r => {
+        if (!visited.has(r._rowIndex)) {
+            floodFill(r._rowIndex, spoolCounter++);
+        }
+    });
+
+    return spools;
+};
+
+// Generates distinct colors based on ID
+const spoolColor = (spoolId) => {
+    const colors = ['#f87171', '#fb923c', '#facc15', '#4ade80', '#2dd4bf', '#60a5fa', '#818cf8', '#c084fc', '#f472b6'];
+    if (!spoolId) return '#64748b';
+    return colors[spoolId % colors.length];
+};
+
 // ----------------------------------------------------
 // Performance Optimized Instanced Pipes Rendering
 // ----------------------------------------------------
 const InstancedPipes = () => {
   const getPipes = useStore(state => state.getPipes);
+  const colorMode = useStore(state => state.colorMode);
+  const dataTable = useStore(state => state.dataTable);
   const pipes = getPipes();
   const meshRef = useRef();
 
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  const c = useMemo(() => new THREE.Color(), []);
+
+  // Compute spools globally if needed
+  const spools = useMemo(() => computeSpools(dataTable), [dataTable]);
 
   useEffect(() => {
     if (!meshRef.current || pipes.length === 0) return;
@@ -66,11 +143,17 @@ const InstancedPipes = () => {
 
       dummy.updateMatrix();
       meshRef.current.setMatrixAt(i, dummy.matrix);
+
+      // Color
+      const colStr = colorMode === 'SPOOL' ? spoolColor(spools[element._rowIndex]) : typeColor(element.type);
+      c.set(colStr);
+      meshRef.current.setColorAt(i, c);
     });
 
     meshRef.current.instanceMatrix.needsUpdate = true;
+    if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
     meshRef.current.computeBoundingSphere();
-  }, [pipes, dummy]);
+  }, [pipes, dummy, colorMode, spools, c]);
 
   const [selectedGeom, setSelectedGeom] = useState(null);
 
@@ -132,6 +215,11 @@ const InstancedPipes = () => {
 const ImmutableComponents = () => {
   const getImmutables = useStore(state => state.getImmutables);
   const elements = getImmutables();
+  const colorMode = useStore(state => state.colorMode);
+  const dataTable = useStore(state => state.dataTable);
+
+  // Re-use compute spools if needed here
+  const spools = useMemo(() => computeSpools(dataTable), [dataTable]);
 
   if (elements.length === 0) return null;
 
@@ -150,7 +238,7 @@ const ImmutableComponents = () => {
         const up  = new THREE.Vector3(0, 1, 0);
         const quat = new THREE.Quaternion().setFromUnitVectors(up, dir);
         const r = el.bore ? el.bore / 2 : 5;
-        const color = typeColor(el.type);
+        const color = colorMode === 'SPOOL' ? spoolColor(spools[el._rowIndex]) : typeColor(el.type);
         const type = (el.type || '').toUpperCase();
 
         const handleSelect = (e) => {
@@ -305,10 +393,21 @@ const DraggableComponents = ({ snapResolution, onDragCommit, orbitRef }) => {
     if (!ray.intersectPlane(dragPlane, intersect)) return;
     const rawDelta = intersect.clone().sub(dragState.hitPoint);
 
+    const orthoMode = useStore.getState().orthoMode;
+
     // Axis Lock Logic
     if (dragAxisLock === 'X') { rawDelta.y = 0; rawDelta.z = 0; }
-    if (dragAxisLock === 'Y') { rawDelta.x = 0; rawDelta.z = 0; }
-    if (dragAxisLock === 'Z') { rawDelta.x = 0; rawDelta.y = 0; }
+    else if (dragAxisLock === 'Y') { rawDelta.x = 0; rawDelta.z = 0; }
+    else if (dragAxisLock === 'Z') { rawDelta.x = 0; rawDelta.y = 0; }
+    else if (orthoMode) {
+      // Find major axis and zero out others
+      const absX = Math.abs(rawDelta.x);
+      const absY = Math.abs(rawDelta.y);
+      const absZ = Math.abs(rawDelta.z);
+      if (absX >= absY && absX >= absZ) { rawDelta.y = 0; rawDelta.z = 0; }
+      else if (absY >= absX && absY >= absZ) { rawDelta.x = 0; rawDelta.z = 0; }
+      else { rawDelta.x = 0; rawDelta.y = 0; }
+    }
 
     const snapped = new THREE.Vector3(snapV(rawDelta.x), snapV(rawDelta.y), snapV(rawDelta.z));
     setDragState(prev => prev ? { ...prev, delta: snapped } : null);
@@ -796,6 +895,117 @@ const GlobalSnapLayer = () => {
 };
 
 // ----------------------------------------------------
+// Marquee Overlay
+// ----------------------------------------------------
+const MarqueeLayer = () => {
+    const canvasMode = useStore(state => state.canvasMode);
+    const setCanvasMode = useStore(state => state.setCanvasMode);
+    const dataTable = useStore(state => state.dataTable);
+    const setMultiSelect = useStore(state => state.setMultiSelect);
+    const [startPt, setStartPt] = useState(null);
+    const [currPt, setCurrPt] = useState(null);
+
+    const isActive = canvasMode === 'MARQUEE_SELECT' || canvasMode === 'MARQUEE_ZOOM';
+    if (!isActive) return null;
+
+    const handlePointerDown = (e) => {
+        e.stopPropagation();
+        setStartPt(e.point.clone());
+        setCurrPt(e.point.clone());
+        e.target.setPointerCapture(e.pointerId);
+    };
+
+    const handlePointerMove = (e) => {
+        if (!startPt) return;
+        setCurrPt(e.point.clone());
+    };
+
+    const handlePointerUp = (e) => {
+        if (!startPt || !currPt) return;
+        e.stopPropagation();
+        e.target.releasePointerCapture(e.pointerId);
+
+        // Compute Bounding Box
+        const minX = Math.min(startPt.x, currPt.x);
+        const maxX = Math.max(startPt.x, currPt.x);
+        const minY = Math.min(startPt.y, currPt.y) - 5000; // expand Y broadly since dragging in top-down view is usually X/Z
+        const maxY = Math.max(startPt.y, currPt.y) + 5000;
+        const minZ = Math.min(startPt.z, currPt.z);
+        const maxZ = Math.max(startPt.z, currPt.z);
+        const box = new THREE.Box3(new THREE.Vector3(minX, minY, minZ), new THREE.Vector3(maxX, maxY, maxZ));
+
+        // Find intersecting elements
+        const selected = [];
+        dataTable.forEach(el => {
+            if (useStore.getState().hiddenElementIds.includes(el._rowIndex)) return;
+
+            let pts = [];
+            if (el.ep1) pts.push(new THREE.Vector3(el.ep1.x, el.ep1.y, el.ep1.z));
+            if (el.ep2) pts.push(new THREE.Vector3(el.ep2.x, el.ep2.y, el.ep2.z));
+
+            // If dragging Right-to-Left (Crossing):
+            // We just need any point inside box (simplification, real crossing tests segment intersection).
+            const isCrossing = currPt.x < startPt.x;
+
+            let allInside = pts.length > 0;
+            let anyInside = false;
+
+            pts.forEach(pt => {
+                const inside = box.containsPoint(pt);
+                if (!inside) allInside = false;
+                if (inside) anyInside = true;
+            });
+
+            if ((isCrossing && anyInside) || (!isCrossing && allInside)) {
+                selected.push(el);
+            }
+        });
+
+        if (canvasMode === 'MARQUEE_SELECT') {
+            setMultiSelect(selected.map(e => e._rowIndex));
+        } else if (canvasMode === 'MARQUEE_ZOOM' && selected.length > 0) {
+            window.dispatchEvent(new CustomEvent('canvas-auto-center', { detail: { elements: selected } }));
+        }
+
+        setStartPt(null);
+        setCurrPt(null);
+        setCanvasMode('VIEW');
+    };
+
+    return (
+        <group>
+            {/* Transparent click plane positioned up slightly to avoid z-fighting */}
+            <mesh
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                rotation={[-Math.PI / 2, 0, 0]}
+                position={[0, Math.max(startPt?.y || 0, 0) + 1, 0]}
+            >
+                <planeGeometry args={[500000, 500000]} />
+                <meshBasicMaterial transparent opacity={0} depthTest={false} />
+            </mesh>
+
+            {/* Marquee Visuals */}
+            {startPt && currPt && (
+                <Line
+                    points={[
+                        new THREE.Vector3(startPt.x, startPt.y, startPt.z),
+                        new THREE.Vector3(currPt.x, startPt.y, startPt.z),
+                        new THREE.Vector3(currPt.x, startPt.y, currPt.z),
+                        new THREE.Vector3(startPt.x, startPt.y, currPt.z),
+                        new THREE.Vector3(startPt.x, startPt.y, startPt.z),
+                    ]}
+                    color={currPt.x < startPt.x ? "#10b981" : "#3b82f6"} // Green for crossing, Blue for window
+                    lineWidth={3}
+                    depthTest={false}
+                />
+            )}
+        </group>
+    );
+};
+
+// ----------------------------------------------------
 // Measure Tool
 // ----------------------------------------------------
 const MeasureTool = () => {
@@ -927,7 +1137,7 @@ const BreakPipeLayer = () => {
                  but they are already rendered. We can render a transparent overlay of pipes here.
              */}
              <group onPointerMove={handlePointerMove}>
-                {dataTable.filter(r => (r.type||'').toUpperCase() === 'PIPE').map((pipe, i) => {
+                {dataTable.filter(r => (r.type||'').toUpperCase() === 'PIPE' && !useStore.getState().hiddenElementIds.includes(r._rowIndex)).map((pipe, i) => {
                     if (!pipe.ep1 || !pipe.ep2) return null;
                     const v1 = new THREE.Vector3(pipe.ep1.x, pipe.ep1.y, pipe.ep1.z);
                     const v2 = new THREE.Vector3(pipe.ep2.x, pipe.ep2.y, pipe.ep2.z);
@@ -976,7 +1186,20 @@ const EndpointSnapLayer = () => {
     const snapRadius = 50; // mm
 
     const handlePointerMove = (e) => {
-        setCursorPos(e.point);
+        let pt = e.point.clone();
+
+        if (connectDraft && useStore.getState().orthoMode) {
+            const rawDelta = pt.clone().sub(connectDraft.fromPosition);
+            const absX = Math.abs(rawDelta.x);
+            const absY = Math.abs(rawDelta.y);
+            const absZ = Math.abs(rawDelta.z);
+            if (absX >= absY && absX >= absZ) { rawDelta.y = 0; rawDelta.z = 0; }
+            else if (absY >= absX && absY >= absZ) { rawDelta.x = 0; rawDelta.z = 0; }
+            else { rawDelta.x = 0; rawDelta.y = 0; }
+            pt = connectDraft.fromPosition.clone().add(rawDelta);
+        }
+
+        setCursorPos(pt);
         let nearest = null;
         let minDist = snapRadius;
 
@@ -1385,15 +1608,17 @@ const ControlsAutoCenter = ({ externalRef }) => {
             isAnimating.current = true;
         };
 
-        const handleCenter = () => {
+        const handleCenter = (e) => {
             const pipes = getPipes();
             if (pipes.length === 0 || !controlsRef.current) return;
 
-            // Calculate bounding box of all pipes
             let minX = Infinity, minY = Infinity, minZ = Infinity;
             let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
 
-            pipes.forEach(p => {
+            // Optional explicit list of elements to frame
+            const elsToFrame = e?.detail?.elements || pipes;
+
+            elsToFrame.forEach(p => {
                 if (p.ep1) {
                     minX = Math.min(minX, p.ep1.x); minY = Math.min(minY, p.ep1.y); minZ = Math.min(minZ, p.ep1.z);
                     maxX = Math.max(maxX, p.ep1.x); maxY = Math.max(maxY, p.ep1.y); maxZ = Math.max(maxZ, p.ep1.z);
@@ -1476,6 +1701,8 @@ export function CanvasTab() {
   const setShowGapRadar = useStore(state => state.setShowGapRadar);
   const showEPLabels = useStore(state => state.showEPLabels);
   const setShowEPLabels = useStore(state => state.setShowEPLabels);
+  const colorMode = useStore(state => state.colorMode);
+  const setColorMode = useStore(state => state.setColorMode);
   const dragAxisLock = useStore(state => state.dragAxisLock);
   const setDragAxisLock = useStore(state => state.setDragAxisLock);
   const undo = useStore(state => state.undo);
@@ -1520,6 +1747,7 @@ export function CanvasTab() {
               case 'x': setDragAxisLock('X'); break;
               case 'y': setDragAxisLock('Y'); break;
               case 'z': setDragAxisLock('Z'); break;
+              case 'o': useStore.getState().toggleOrthoMode(); break;
               case 'f':
                   if (useStore.getState().selectedElementId) {
                       const el = dataTable.find(r => r._rowIndex === useStore.getState().selectedElementId);
@@ -1547,6 +1775,18 @@ export function CanvasTab() {
                           dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Applied/Fix", message: `Deleted Row ${selId} via keyboard.` } });
                       }
                   }
+                  break;
+              case 'h':
+                  if (e.shiftKey) {
+                      useStore.getState().isolateSelected();
+                  } else if (e.altKey) {
+                      useStore.getState().unhideAll();
+                  } else {
+                      useStore.getState().hideSelected();
+                  }
+                  break;
+              case 'u':
+                  useStore.getState().unhideAll();
                   break;
               default:
                   // Ctrl+Z
@@ -1717,10 +1957,31 @@ export function CanvasTab() {
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
                 </button>
+                <button
+                    onClick={() => setCanvasMode(canvasMode === 'MARQUEE_SELECT' ? 'VIEW' : 'MARQUEE_SELECT')}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'MARQUEE_SELECT' ? 'bg-blue-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                    title="Marquee Select Mode"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeDasharray="4 4" /></svg>
+                </button>
+                <button
+                    onClick={() => setCanvasMode(canvasMode === 'MARQUEE_ZOOM' ? 'VIEW' : 'MARQUEE_ZOOM')}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'MARQUEE_ZOOM' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                    title="Marquee Zoom Mode"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><rect x="8" y="8" width="6" height="6" strokeDasharray="2 2"/></svg>
+                </button>
             </div>
 
             {/* Toggle Buttons (Right) */}
             <div className="flex gap-1 pl-1">
+                <button
+                    onClick={() => setColorMode(colorMode === 'TYPE' ? 'SPOOL' : 'TYPE')}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition ${colorMode === 'SPOOL' ? 'bg-purple-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                    title="Toggle Spool Colors"
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </button>
                 <button
                     onClick={() => setShowGapRadar(!showGapRadar)}
                     className={`w-8 h-8 flex items-center justify-center rounded transition ${showGapRadar ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
@@ -1823,6 +2084,7 @@ export function CanvasTab() {
         <BreakPipeLayer />
         <InsertSupportLayer />
         <EPLabelsLayer />
+        <MarqueeLayer />
 
         {(() => {
             const allIssues = [
