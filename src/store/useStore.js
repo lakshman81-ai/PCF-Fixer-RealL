@@ -33,6 +33,74 @@ export const useStore = create((set, get) => ({
       return { proposals: updatedProposals, dataTable: updatedTable };
   }),
 
+  // Canvas Mode Machine
+  canvasMode: 'VIEW', // 'VIEW' | 'CONNECT' | 'BREAK' | 'INSERT_SUPPORT' | 'MEASURE'
+  setCanvasMode: (mode) => set({ canvasMode: mode }),
+
+  // Undo Stack
+  history: [],
+  historyIdx: -1,
+  pushHistory: (label) => set((state) => {
+    // Take a deep snapshot of the current dataTable
+    const snapshot = state.dataTable.map(r => ({
+      ...r,
+      ep1: r.ep1 ? { ...r.ep1 } : null,
+      ep2: r.ep2 ? { ...r.ep2 } : null,
+      cp: r.cp ? { ...r.cp } : null,
+      bp: r.bp ? { ...r.bp } : null,
+    }));
+
+    // Slice off any redo history
+    const newHistory = state.history.slice(0, state.historyIdx + 1);
+    newHistory.push({ label, data: snapshot });
+
+    // Buffer depth: 20
+    if (newHistory.length > 20) {
+      newHistory.shift();
+    }
+    return { history: newHistory, historyIdx: newHistory.length - 1 };
+  }),
+  undo: () => set((state) => {
+    if (state.historyIdx < 0) return state; // Nothing to undo
+    const snapshotToRestore = state.history[state.historyIdx].data;
+    const newIdx = state.historyIdx - 1;
+
+    window.dispatchEvent(new CustomEvent('zustand-undo'));
+
+    return { dataTable: snapshotToRestore, historyIdx: newIdx };
+  }),
+
+  // Selection & Toggles
+  multiSelectedIds: [],
+  toggleMultiSelect: (id) => set((state) => {
+    const isSelected = state.multiSelectedIds.includes(id);
+    if (isSelected) {
+      return { multiSelectedIds: state.multiSelectedIds.filter(selectedId => selectedId !== id) };
+    } else {
+      return { multiSelectedIds: [...state.multiSelectedIds, id] };
+    }
+  }),
+  clearMultiSelect: () => set({ multiSelectedIds: [] }),
+  deleteElements: (ids) => set((state) => {
+    const updatedTable = state.dataTable.filter(r => !ids.includes(r._rowIndex));
+    // Important: we also dispatch to AppContext in the CanvasTab
+    return { dataTable: updatedTable, multiSelectedIds: [] };
+  }),
+  dragAxisLock: null, // 'X' | 'Y' | 'Z' | null
+  setDragAxisLock: (axis) => set({ dragAxisLock: axis }),
+  showEPLabels: false,
+  setShowEPLabels: (show) => set({ showEPLabels: show }),
+  showGapRadar: false,
+  setShowGapRadar: (show) => set({ showGapRadar: show }),
+
+  // Measure tool
+  measurePts: [],
+  addMeasurePt: (pt) => set((state) => {
+    if (state.measurePts.length >= 2) return { measurePts: [pt] }; // reset on 3rd click
+    return { measurePts: [...state.measurePts, pt] };
+  }),
+  clearMeasure: () => set({ measurePts: [] }),
+
   // Highlighting/Interaction state for the canvas
   selectedElementId: null,
   hoveredElementId: null,
