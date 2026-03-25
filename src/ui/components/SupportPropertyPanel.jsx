@@ -61,7 +61,9 @@ export const SupportPropertyPanel = () => {
       });
 
       // Mirror to Zustand
-      const updatedTable = dataTable.filter(r => !selectedSupports.includes(r._rowIndex));
+      const updatedTable = dataTable
+        .filter(r => !selectedSupports.includes(r._rowIndex))
+        .map((row, idx) => ({ ...row, _rowIndex: idx + 1 })); // Re-index after delete
       useStore.getState().setDataTable(updatedTable);
 
       dispatch({ type: "ADD_LOG", payload: { stage: "BATCH_DELETE", type: "Applied/Fix", message: `Deleted ${selectedSupports.length} supports.` } });
