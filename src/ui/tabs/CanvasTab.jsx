@@ -1096,6 +1096,7 @@ const BreakPipeLayer = () => {
     const dataTable = useStore(state => state.dataTable);
     const { dispatch } = useAppContext();
     const pushHistory = useStore(state => state.pushHistory);
+    const cursorSnapPoint = useStore(state => state.cursorSnapPoint);
 
     const [hoverPos, setHoverPos] = useState(null);
 
@@ -1107,8 +1108,6 @@ const BreakPipeLayer = () => {
             setHoverPos(e.point);
         }
     };
-
-    const cursorSnapPoint = useStore(state => state.cursorSnapPoint);
 
     const handlePointerDown = (e, pipeRow) => {
         e.stopPropagation();
@@ -1448,6 +1447,7 @@ const InsertSupportLayer = () => {
     const dataTable = useStore(state => state.dataTable);
     const { dispatch } = useAppContext();
     const pushHistory = useStore(state => state.pushHistory);
+    const cursorSnapPoint = useStore(state => state.cursorSnapPoint);
 
     const [hoverPos, setHoverPos] = useState(null);
 
@@ -1456,8 +1456,6 @@ const InsertSupportLayer = () => {
     const handlePointerMove = (e) => {
         if (e.point) setHoverPos(e.point);
     };
-
-    const cursorSnapPoint = useStore(state => state.cursorSnapPoint);
 
     const handlePointerDown = (e, pipeRow) => {
         e.stopPropagation();
