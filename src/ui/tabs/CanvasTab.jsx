@@ -160,7 +160,18 @@ const InstancedPipes = () => {
       meshRef.current.setMatrixAt(i, dummy.matrix);
 
       // Color
-      const colStr = colorMode === 'SPOOL' ? spoolColor(spools[element._rowIndex]) : typeColor(element.type);
+      let colStr = typeColor(element.type);
+      if (colorMode === 'SPOOL') {
+          colStr = spoolColor(spools[element._rowIndex]);
+      } else if (colorMode !== 'TYPE') {
+          // It's a CA field
+          const caVal = element[colorMode];
+          if (caVal) {
+              colStr = getCAColor(caVal);
+          } else {
+              colStr = '#475569'; // slate-600 for missing CA
+          }
+      }
       c.set(colStr);
       meshRef.current.setColorAt(i, c);
     });
@@ -253,7 +264,17 @@ const ImmutableComponents = () => {
         const up  = new THREE.Vector3(0, 1, 0);
         const quat = new THREE.Quaternion().setFromUnitVectors(up, dir);
         const r = el.bore ? el.bore / 2 : 5;
-        const color = colorMode === 'SPOOL' ? spoolColor(spools[el._rowIndex]) : typeColor(el.type);
+        let color = typeColor(el.type);
+        if (colorMode === 'SPOOL') {
+            color = spoolColor(spools[el._rowIndex]);
+        } else if (colorMode !== 'TYPE') {
+            const caVal = el[colorMode];
+            if (caVal) {
+                color = getCAColor(caVal);
+            } else {
+                color = '#475569';
+            }
+        }
         const type = (el.type || '').toUpperCase();
 
         const handleSelect = (e) => {
@@ -671,22 +692,17 @@ const SingleIssuePanel = ({ proposals, validationIssues, currentIssueIndex, setC
     const safeIndex = Math.max(0, Math.min(currentIssueIndex, allIssues.length - 1));
     const currentItem = allIssues[safeIndex];
 
-    useEffect(() => {
-        if (allIssues.length > 0 && onAutoCenter) {
-            onAutoCenter();
-        }
-    }, [safeIndex, allIssues.length]);
-
-    if (allIssues.length === 0) return null;
-
-    const handlePrev = () => setCurrentIssueIndex(Math.max(0, currentIssueIndex - 1));
-    const handleNext = () => setCurrentIssueIndex(Math.min(allIssues.length - 1, currentIssueIndex + 1));
-
     // Draggable state using simple absolute positioning
     const [pos, setPos] = useState({ x: 0, y: 0 }); // Note: We handle setting this dynamically
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const panelRef = useRef(null);
+
+    useEffect(() => {
+        if (allIssues.length > 0 && onAutoCenter) {
+            onAutoCenter();
+        }
+    }, [safeIndex, allIssues.length, onAutoCenter]);
 
     // Initialize position to bottom center once
     useEffect(() => {
@@ -702,6 +718,11 @@ const SingleIssuePanel = ({ proposals, validationIssues, currentIssueIndex, setC
              }
         }
     }, [pos.x, pos.y]);
+
+    if (allIssues.length === 0) return null;
+
+    const handlePrev = () => setCurrentIssueIndex(Math.max(0, currentIssueIndex - 1));
+    const handleNext = () => setCurrentIssueIndex(Math.min(allIssues.length - 1, currentIssueIndex + 1));
 
     const handlePointerDown = (e) => {
         setIsDragging(true);
@@ -916,8 +937,6 @@ const LegendLayer = () => {
     const colorMode = useStore(state => state.colorMode);
     const dataTable = useStore(state => state.dataTable);
 
-    if (colorMode === 'TYPE' || colorMode === 'SPOOL') return null;
-
     // Get unique CA values
     const uniqueValues = useMemo(() => {
         const vals = new Set();
@@ -927,6 +946,7 @@ const LegendLayer = () => {
         return Array.from(vals).sort();
     }, [dataTable, colorMode]);
 
+    if (colorMode === 'TYPE' || colorMode === 'SPOOL') return null;
     if (uniqueValues.length === 0) return null;
 
     return (
@@ -1347,16 +1367,16 @@ const EndpointSnapLayer = () => {
                     bore: sourceRow.bore || 100,
                     pipelineRef: sourceRow.pipelineRef || 'UNKNOWN',
                     skey: 'PIPE',
-                    ca1: sourceRow.ca1 || '',
-                    ca2: sourceRow.ca2 || '',
-                    ca3: sourceRow.ca3 || '',
-                    ca4: sourceRow.ca4 || '',
-                    ca5: sourceRow.ca5 || '',
-                    ca6: sourceRow.ca6 || '',
-                    ca7: sourceRow.ca7 || '',
-                    ca8: sourceRow.ca8 || '',
-                    ca9: sourceRow.ca9 || '',
-                    ca10: sourceRow.ca10 || '',
+                    CA1: sourceRow.CA1 || '',
+                    CA2: sourceRow.CA2 || '',
+                    CA3: sourceRow.CA3 || '',
+                    CA4: sourceRow.CA4 || '',
+                    CA5: sourceRow.CA5 || '',
+                    CA6: sourceRow.CA6 || '',
+                    CA7: sourceRow.CA7 || '',
+                    CA8: sourceRow.CA8 || '',
+                    CA9: sourceRow.CA9 || '',
+                    CA10: sourceRow.CA10 || '',
                     tag: `${sourceRow.pipelineRef || 'UNKNOWN'}_3DTopoBridge`
                 };
 
@@ -1911,9 +1931,20 @@ export function CanvasTab() {
 
       window.addEventListener('keydown', handleKeyDown);
       window.addEventListener('keyup', handleKeyUp);
+
+      const handleZustandUndo = () => {
+          // Sync Zustand's newly restored state back to AppContext
+          const restoredTable = useStore.getState().dataTable;
+          dispatch({ type: "APPLY_GAP_FIX", payload: { updatedTable: restoredTable } });
+          dispatch({ type: "ADD_LOG", payload: { stage: "INTERACTIVE", type: "Info", message: "Undo completed." } });
+      };
+
+      window.addEventListener('zustand-undo', handleZustandUndo);
+
       return () => {
           window.removeEventListener('keydown', handleKeyDown);
           window.removeEventListener('keyup', handleKeyUp);
+          window.removeEventListener('zustand-undo', handleZustandUndo);
       };
   }, [canvasMode, setCanvasMode, clearMultiSelect, setDragAxisLock, undo, multiSelectedIds, dispatch, pushHistory, deleteElements, dataTable]);
 
@@ -2031,7 +2062,7 @@ export function CanvasTab() {
       <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 items-end">
 
         {/* Restructured Toolbar */}
-        <div className="flex bg-slate-800/80 backdrop-blur border border-slate-700 p-1 rounded-lg shadow-lg gap-2">
+        <div className="flex bg-slate-800 backdrop-blur border border-slate-700 p-1 rounded-lg shadow-lg gap-2 relative z-50 pointer-events-auto">
 
             {/* Mode Buttons (Left) */}
             <div className="flex border-r border-slate-700 pr-2 gap-1">
@@ -2040,42 +2071,42 @@ export function CanvasTab() {
                     className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'CONNECT' ? 'bg-amber-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
                     title="CONNECT Mode (C)"
                 >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
                 </button>
                 <button
                     onClick={() => setCanvasMode(canvasMode === 'BREAK' ? 'VIEW' : 'BREAK')}
                     className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'BREAK' ? 'bg-red-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
                     title="BREAK Mode (B)"
                 >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
                 </button>
                 <button
                     onClick={() => setCanvasMode(canvasMode === 'MEASURE' ? 'VIEW' : 'MEASURE')}
                     className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'MEASURE' ? 'bg-yellow-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
                     title="MEASURE Mode (M)"
                 >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 1 0 2.829 2.828z"/><path d="m6.3 14.5-4 4"/><path d="m16 5.3-4 4"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 1 0 2.829 2.828z"/><path d="m6.3 14.5-4 4"/><path d="m16 5.3-4 4"/></svg>
                 </button>
                 <button
                     onClick={() => setCanvasMode(canvasMode === 'INSERT_SUPPORT' ? 'VIEW' : 'INSERT_SUPPORT')}
                     className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'INSERT_SUPPORT' ? 'bg-green-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
                     title="INSERT SUPPORT Mode (S)"
                 >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
                 </button>
                 <button
                     onClick={() => setCanvasMode(canvasMode === 'MARQUEE_SELECT' ? 'VIEW' : 'MARQUEE_SELECT')}
                     className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'MARQUEE_SELECT' ? 'bg-blue-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
                     title="Marquee Select Mode"
                 >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeDasharray="4 4" /></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeDasharray="4 4" /></svg>
                 </button>
                 <button
                     onClick={() => setCanvasMode(canvasMode === 'MARQUEE_ZOOM' ? 'VIEW' : 'MARQUEE_ZOOM')}
                     className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'MARQUEE_ZOOM' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
                     title="Marquee Zoom Mode"
                 >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><rect x="8" y="8" width="6" height="6" strokeDasharray="2 2"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><rect x="8" y="8" width="6" height="6" strokeDasharray="2 2"/></svg>
                 </button>
             </div>
 

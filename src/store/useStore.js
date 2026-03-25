@@ -102,7 +102,9 @@ export const useStore = create((set, get) => ({
   setMultiSelect: (ids) => set({ multiSelectedIds: ids }),
   clearMultiSelect: () => set({ multiSelectedIds: [] }),
   deleteElements: (ids) => set((state) => {
-    const updatedTable = state.dataTable.filter(r => !ids.includes(r._rowIndex));
+    const updatedTable = state.dataTable
+      .filter(r => !ids.includes(r._rowIndex))
+      .map((row, idx) => ({ ...row, _rowIndex: idx + 1 })); // Re-index after delete
     // Important: we also dispatch to AppContext in the CanvasTab
     return { dataTable: updatedTable, multiSelectedIds: [] };
   }),
