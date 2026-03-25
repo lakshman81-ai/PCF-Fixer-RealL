@@ -30,21 +30,6 @@ export function Header() {
     e.target.value = null;
   };
 
-  const dataTable = useStore(state => state.dataTable);
-
-  const [key1, setKey1] = React.useState('');
-  const [key2, setKey2] = React.useState('');
-
-  const uniquePipelineRefs = React.useMemo(() => {
-    const refs = new Set();
-    dataTable?.forEach(row => {
-      if (row.pipelineRef) refs.add(row.pipelineRef);
-    });
-    return Array.from(refs).sort();
-  }, [dataTable]);
-
-  const lineKey = `${key1}${key1 && key2 ? '-' : ''}${key2}`;
-
   return (
     <header className="bg-slate-900 text-white shadow-md border-b border-slate-700">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -67,29 +52,6 @@ export function Header() {
               style={{ display: 'none' }}
             />
           </nav>
-        </div>
-
-        {/* Line Key Header Placeholder */}
-        <div className="flex items-center space-x-2 ml-4">
-            <span className="text-xs text-slate-400 font-semibold uppercase">Line Key:</span>
-
-            <select value={key1} onChange={(e) => setKey1(e.target.value)} className="bg-slate-800 text-slate-200 text-xs py-1 px-2 rounded border border-slate-700 outline-none">
-                <option value="">Select Key1 (Ref)</option>
-                {uniquePipelineRefs.map(ref => (
-                    <option key={ref} value={ref}>{ref}</option>
-                ))}
-            </select>
-
-            <select value={key2} onChange={(e) => setKey2(e.target.value)} className="bg-slate-800 text-slate-200 text-xs py-1 px-2 rounded border border-slate-700 outline-none">
-                <option value="">Select Key2</option>
-                <option value="A1">A1</option>
-                <option value="B2">B2</option>
-                <option value="C3">C3</option>
-            </select>
-
-            <div className="bg-slate-950 text-amber-400 font-mono text-xs py-1 px-3 border border-slate-700 rounded w-48 truncate" title={lineKey || 'N/A'}>
-                {lineKey || '---'}
-            </div>
         </div>
 
         <div className="flex items-center space-x-4 text-sm text-slate-400">

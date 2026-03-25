@@ -131,43 +131,6 @@ function reducer(state, action) {
       );
       return { ...state, stage2Data: updated };
     }
-    case "DELETE_ELEMENTS": {
-      // payload: { rowIndices: number[] }
-      const newTable = state.stage2Data.filter(r => !action.payload.rowIndices.includes(r._rowIndex));
-      const reindexed = newTable.map((r, i) => ({ ...r, _rowIndex: i + 1 }));
-      return { ...state, stage2Data: reindexed, history: [...(state.history || []), state.stage2Data] };
-    }
-    case "BREAK_PIPE": {
-      // payload: { rowIndex, rowA, rowB }
-      const newTable = state.stage2Data.flatMap(r =>
-        r._rowIndex === action.payload.rowIndex ? [action.payload.rowA, action.payload.rowB] : [r]
-      );
-      const reindexed = newTable.map((r, i) => ({ ...r, _rowIndex: i + 1 }));
-      return { ...state, stage2Data: reindexed, history: [...(state.history || []), state.stage2Data] };
-    }
-    case "INSERT_SUPPORT": {
-      // payload: { afterRowIndex, supportRow }
-      const newTable = [...state.stage2Data];
-      const idx = newTable.findIndex(r => r._rowIndex === action.payload.afterRowIndex);
-      if (idx !== -1) {
-        newTable.splice(idx + 1, 0, action.payload.supportRow);
-      } else {
-        newTable.push(action.payload.supportRow);
-      }
-      const reindexed = newTable.map((r, i) => ({ ...r, _rowIndex: i + 1 }));
-      return { ...state, stage2Data: reindexed, history: [...(state.history || []), state.stage2Data] };
-    }
-    case "BATCH_UPDATE_SUPPORT_ATTRS": {
-      // payload: { rowIndices, attrs }
-      const newTable = state.stage2Data.map(r =>
-        action.payload.rowIndices.includes(r._rowIndex) ? { ...r, ...action.payload.attrs } : r
-      );
-      return { ...state, stage2Data: newTable, history: [...(state.history || []), state.stage2Data] };
-    }
-    case "APPLY_GAP_FIX": {
-      // payload: { updatedTable }
-      return { ...state, stage2Data: action.payload.updatedTable, history: [...(state.history || []), state.stage2Data] };
-    }
     case "SET_STAGE_3_DATA":
       return { ...state, stage3Data: action.payload };
     case "SET_CONFIG":
@@ -227,6 +190,46 @@ function reducer(state, action) {
           smartFixPass: Math.max(0, (state.smartFix.smartFixPass || 1) - 1),
         }
       };
+
+    // Wave 5 - New Structural Reducer Cases for Interactive Editor
+    case "DELETE_ELEMENTS": {
+        const rowIndices = action.payload.rowIndices;
+        const updated = state.stage2Data.filter(el => !rowIndices.includes(el._rowIndex));
+        const reindexed = updated.map((el, i) => ({ ...el, _rowIndex: i + 1 }));
+        return { ...state, stage2Data: reindexed };
+    }
+    case "BREAK_PIPE": {
+        const { rowIndex, rowA, rowB } = action.payload;
+        const updated = state.stage2Data.flatMap(r =>
+            r._rowIndex === rowIndex ? [rowA, rowB] : [r]
+        );
+        const reindexed = updated.map((el, i) => ({ ...el, _rowIndex: i + 1 }));
+        return { ...state, stage2Data: reindexed };
+    }
+    case "INSERT_SUPPORT": {
+        const { afterRowIndex, supportRow } = action.payload;
+        const idx = state.stage2Data.findIndex(r => r._rowIndex === afterRowIndex);
+        const updated = [...state.stage2Data];
+        if (idx !== -1) {
+            updated.splice(idx + 1, 0, supportRow);
+        } else {
+            updated.push(supportRow);
+        }
+        const reindexed = updated.map((el, i) => ({ ...el, _rowIndex: i + 1 }));
+        return { ...state, stage2Data: reindexed };
+    }
+    case "BATCH_UPDATE_SUPPORT_ATTRS": {
+        const { rowIndices, attrs } = action.payload;
+        const updated = state.stage2Data.map(r =>
+            rowIndices.includes(r._rowIndex) ? { ...r, ...attrs } : r
+        );
+        return { ...state, stage2Data: updated };
+    }
+    case "APPLY_GAP_FIX": {
+        // Full table replace (gap fix engine returns new table)
+        return { ...state, stage2Data: action.payload.updatedTable };
+    }
+
     default:
       return state;
   }

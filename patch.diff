@@ -1,0 +1,47 @@
+--- src/ui/tabs/CanvasTab.jsx
++++ src/ui/tabs/CanvasTab.jsx
+@@ -252,6 +252,7 @@
+   const [dragState, setDragState] = useState(null);
+   const dragPlane = useMemo(() => new THREE.Plane(), []);
++  const dragAxisLock = useStore(state => state.dragAxisLock);
+   const ray = useMemo(() => new THREE.Ray(), []);
+
+   const snapV = useCallback((v) => Math.round(v / snapResolution) * snapResolution, [snapResolution]);
+@@ -282,10 +283,21 @@
+     const intersect = new THREE.Vector3();
+     if (!ray.intersectPlane(dragPlane, intersect)) return;
+     const rawDelta = intersect.clone().sub(dragState.hitPoint);
+
++    // Axis Lock Logic
++    if (dragAxisLock === 'X') { rawDelta.y = 0; rawDelta.z = 0; }
++    else if (dragAxisLock === 'Y') { rawDelta.x = 0; rawDelta.z = 0; }
++    else if (dragAxisLock === 'Z') { rawDelta.x = 0; rawDelta.y = 0; }
++
+     const snapped = new THREE.Vector3(snapV(rawDelta.x), snapV(rawDelta.y), snapV(rawDelta.z));
+     setDragState(prev => prev ? { ...prev, delta: snapped } : null);
+-  }, [dragState, camera, gl, dragPlane, ray, snapV]);
++  }, [dragState, camera, gl, dragPlane, ray, snapV, dragAxisLock]);
+
+   const handlePointerUp = useCallback((e) => {
+@@ -304,9 +316,21 @@
+
+   if (elements.length === 0) return null;
+
++  const dragOrigin = dragState?.original?.ep1 ? new THREE.Vector3(dragState.original.ep1.x, dragState.original.ep1.y, dragState.original.ep1.z) : new THREE.Vector3();
++
+   return (
+     <group onPointerMove={handlePointerMove} onPointerUp={handlePointerUp}>
++      {/* Axis Lock Guide Line */}
++      {dragState && dragAxisLock && (
++        <Line
++          points={[
++            new THREE.Vector3().copy(dragOrigin).add(new THREE.Vector3(dragAxisLock==='X'?-10000:0, dragAxisLock==='Y'?-10000:0, dragAxisLock==='Z'?-10000:0)),
++            new THREE.Vector3().copy(dragOrigin).add(new THREE.Vector3(dragAxisLock==='X'?10000:0, dragAxisLock==='Y'?10000:0, dragAxisLock==='Z'?10000:0))
++          ]}
++          color={dragAxisLock === 'X' ? 'red' : dragAxisLock === 'Y' ? 'green' : 'blue'}
++          lineWidth={2}
++          dashed
++        />
++      )}
+       {elements.map((el) => {
+         const isDragging = dragState?.rowIndex === el._rowIndex;
