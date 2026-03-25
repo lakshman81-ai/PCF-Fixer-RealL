@@ -900,6 +900,43 @@ const GlobalSnapLayer = () => {
 };
 
 // ----------------------------------------------------
+// Custom Legend Layer
+// ----------------------------------------------------
+const LegendLayer = () => {
+    const colorMode = useStore(state => state.colorMode);
+    const dataTable = useStore(state => state.dataTable);
+
+    if (colorMode === 'TYPE' || colorMode === 'SPOOL') return null;
+
+    // Get unique CA values
+    const uniqueValues = useMemo(() => {
+        const vals = new Set();
+        dataTable.forEach(r => {
+            if (r[colorMode]) vals.add(r[colorMode]);
+        });
+        return Array.from(vals).sort();
+    }, [dataTable, colorMode]);
+
+    if (uniqueValues.length === 0) return null;
+
+    return (
+        <div className="absolute top-16 right-4 z-10 flex flex-col gap-1 bg-slate-900/90 p-3 rounded border border-slate-700 backdrop-blur pointer-events-none shadow-xl max-h-96 overflow-y-auto">
+            <h4 className="text-xs font-bold text-slate-300 mb-1 border-b border-slate-700 pb-1">{colorMode} Legend</h4>
+            {uniqueValues.map(val => (
+                <div key={val} className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: getCAColor(val) }}></div>
+                    <span className="text-xs text-slate-400">{val}</span>
+                </div>
+            ))}
+            <div className="flex items-center gap-2 mt-1">
+                <div className="w-3 h-3 rounded-full bg-slate-600"></div>
+                <span className="text-xs text-slate-500 italic">None / Missing</span>
+            </div>
+        </div>
+    );
+};
+
+// ----------------------------------------------------
 // Marquee Overlay
 // ----------------------------------------------------
 const MarqueeLayer = () => {
@@ -1391,9 +1428,24 @@ const GapRadarLayer = () => {
                 const color = gap.dist <= 6.0 ? '#f97316' : '#ef4444'; // Orange for fixable, Red for insert pipe
                 return (
                     <group key={`gap-${i}`}>
+                        {/* Glow effect */}
+                        <Line points={[gap.ptA, gap.ptB]} color={color} lineWidth={12} transparent opacity={0.3} />
+                        {/* Core line */}
                         <Line points={[gap.ptA, gap.ptB]} color={color} lineWidth={4} dashed dashSize={5} gapSize={2} />
-                        <Text position={[gap.mid.x, gap.mid.y + 15, gap.mid.z]} color={color} fontSize={15} anchorX="center" outlineWidth={1} outlineColor="#000">
-                            {gap.dist.toFixed(1)}mm
+
+                        {/* Spheres at endpoints for visibility */}
+                        <mesh position={gap.ptA}>
+                            <sphereGeometry args={[10, 16, 16]} />
+                            <meshBasicMaterial color={color} transparent opacity={0.7} />
+                        </mesh>
+                        <mesh position={gap.ptB}>
+                            <sphereGeometry args={[10, 16, 16]} />
+                            <meshBasicMaterial color={color} transparent opacity={0.7} />
+                        </mesh>
+
+                        {/* Billboard text */}
+                        <Text position={[gap.mid.x, gap.mid.y + 15, gap.mid.z]} color={color} fontSize={20} fontWeight="bold" anchorX="center" outlineWidth={2} outlineColor="#000">
+                            ⚠ {gap.dist.toFixed(1)}mm Gap
                         </Text>
                     </group>
                 );
@@ -1928,10 +1980,11 @@ export function CanvasTab() {
 
 
   return (
-    <div className="flex flex-col h-[calc(100vh-12rem)] w-full overflow-hidden bg-slate-950 rounded-lg border border-slate-800 shadow-inner relative">
+    <div className="flex flex-col h-[calc(100vh-4rem)] w-full overflow-hidden bg-slate-950 rounded-lg border border-slate-800 shadow-inner relative mt-[-2rem]">
 
       {/* New UI Overlays */}
       <SceneHealthHUD />
+      <LegendLayer />
       <SideInspector />
       <SupportPropertyPanel />
       <LogDrawer />
@@ -1989,14 +2042,26 @@ export function CanvasTab() {
             </div>
 
             {/* Toggle Buttons (Right) */}
-            <div className="flex gap-1 pl-1">
-                <button
-                    onClick={() => setColorMode(colorMode === 'TYPE' ? 'SPOOL' : 'TYPE')}
-                    className={`w-8 h-8 flex items-center justify-center rounded transition ${colorMode === 'SPOOL' ? 'bg-purple-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
-                    title="Toggle Spool Colors"
+            <div className="flex gap-1 pl-1 items-center">
+                <select
+                    value={colorMode}
+                    onChange={(e) => setColorMode(e.target.value)}
+                    className="h-8 bg-slate-700 text-slate-300 text-xs rounded border border-slate-600 px-2 outline-none focus:border-indigo-500 cursor-pointer"
+                    title="Color Mode"
                 >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                </button>
+                    <option value="TYPE">Color by Type</option>
+                    <option value="SPOOL">Color by Spool</option>
+                    <option value="CA1">Color by CA1</option>
+                    <option value="CA2">Color by CA2</option>
+                    <option value="CA3">Color by CA3</option>
+                    <option value="CA4">Color by CA4</option>
+                    <option value="CA5">Color by CA5</option>
+                    <option value="CA6">Color by CA6</option>
+                    <option value="CA7">Color by CA7</option>
+                    <option value="CA8">Color by CA8</option>
+                    <option value="CA9">Color by CA9</option>
+                    <option value="CA10">Color by CA10</option>
+                </select>
                 <button
                     onClick={() => setShowGapRadar(!showGapRadar)}
                     className={`w-8 h-8 flex items-center justify-center rounded transition ${showGapRadar ? 'bg-indigo-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
