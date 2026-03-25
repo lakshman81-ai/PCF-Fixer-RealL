@@ -27,6 +27,16 @@ const TYPE_CONFIG = {
 const typeColor = (type) => (TYPE_CONFIG[(type||'').toUpperCase()] || { color: '#64748b' }).color;
 
 // Spool logic
+const getCAColor = (str) => {
+    if (!str) return '#64748b';
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+    return '#' + '00000'.substring(0, 6 - c.length) + c;
+};
+
 const computeSpools = (dataTable) => {
     const spools = {}; // rowIndex -> spoolId
     let spoolCounter = 1;
@@ -1326,23 +1336,48 @@ const EndpointSnapLayer = () => {
 
             const sourceRow = dataTable.find(r => r._rowIndex === connectDraft.fromRowIndex);
             if (sourceRow) {
-                const newRow = {
-                    ...sourceRow,
-                    [connectDraft.fromEP]: { x: nearest.position.x, y: nearest.position.y, z: nearest.position.z }
+                const targetPos = nearest.position;
+                const sourcePos = connectDraft.fromPosition;
+
+                // Synthesize new bridge pipe instead of stretching
+                const newBridgePipe = {
+                    type: 'PIPE',
+                    ep1: { x: sourcePos.x, y: sourcePos.y, z: sourcePos.z },
+                    ep2: { x: targetPos.x, y: targetPos.y, z: targetPos.z },
+                    bore: sourceRow.bore || 100,
+                    pipelineRef: sourceRow.pipelineRef || 'UNKNOWN',
+                    skey: 'PIPE',
+                    ca1: sourceRow.ca1 || '',
+                    ca2: sourceRow.ca2 || '',
+                    ca3: sourceRow.ca3 || '',
+                    ca4: sourceRow.ca4 || '',
+                    ca5: sourceRow.ca5 || '',
+                    ca6: sourceRow.ca6 || '',
+                    ca7: sourceRow.ca7 || '',
+                    ca8: sourceRow.ca8 || '',
+                    ca9: sourceRow.ca9 || '',
+                    ca10: sourceRow.ca10 || '',
+                    tag: `${sourceRow.pipelineRef || 'UNKNOWN'}_3DTopoBridge`
                 };
 
-                // Fast local update
-                updateDataTable([newRow]);
+                // Append the new row to the table
+                const newRowIndex = Math.max(...dataTable.map(r => r._rowIndex || 0)) + 1;
+                newBridgePipe._rowIndex = newRowIndex;
 
-                // Slow global update
+                const updatedTable = [...dataTable, newBridgePipe];
+
+                // Dispatch APPLY_GAP_FIX which replaces the full table in AppContext
                 dispatch({
-                    type: 'BATCH_UPDATE_SUPPORT_ATTRS', // Using existing batch case for arbitrary updates
-                    payload: { rowIndices: [sourceRow._rowIndex], attrs: { [connectDraft.fromEP]: newRow[connectDraft.fromEP] } }
+                    type: 'APPLY_GAP_FIX',
+                    payload: { updatedTable }
                 });
+
+                // Mirror to Zustand store
+                useStore.getState().setDataTable(updatedTable);
 
                 dispatch({
                     type: 'ADD_LOG',
-                    payload: { type: 'Applied/Fix', stage: 'CONNECT_TOOL', message: `Stretched Row ${sourceRow._rowIndex} ${connectDraft.fromEP} to Row ${nearest.rowIndex} ${nearest.epKey}.` }
+                    payload: { type: 'Applied/Fix', stage: 'CONNECT_TOOL', message: `Bridged Row ${sourceRow._rowIndex} and Row ${nearest.rowIndex} with a new PIPE.` }
                 });
             }
         }
@@ -1751,7 +1786,10 @@ const ControlsAutoCenter = ({ externalRef }) => {
         };
     }, []);
 
-    return <OrbitControls ref={(c) => { controlsRef.current = c; if (externalRef) externalRef.current = c; }} makeDefault enableDamping dampingFactor={0.1} />;
+    const canvasMode = useStore(state => state.canvasMode);
+    const controlsEnabled = !['MARQUEE_SELECT', 'MARQUEE_ZOOM', 'CONNECT', 'MEASURE', 'BREAK'].includes(canvasMode);
+
+    return <OrbitControls ref={(c) => { controlsRef.current = c; if (externalRef) externalRef.current = c; }} enabled={controlsEnabled} makeDefault enableDamping dampingFactor={0.1} />;
 };
 
 

@@ -81,16 +81,18 @@ export const fix25mmGapsWithPipe = (dataTable, refPrefix = 'GAPFIX') => {
       const dist = getDist(elA.ep2, elB.ep1);
       if (dist > 6.0 && dist <= 25.0) {
         insertCount++;
+        const prefix = elA.pipelineRef || refPrefix || 'GAPFIX';
         const newPipe = {
           _rowIndex: -1, // Temporary, will be re-indexed
           type: 'PIPE',
           ep1: { ...elA.ep2 },
           ep2: { ...elB.ep1 },
           bore: parseFloat(elA.bore) || 0,
-          pipelineRef: elA.pipelineRef || '',
+          pipelineRef: prefix,
+          tag: `${prefix}_3DTopoBridge_25mmfix`,
           skey: elA.skey || 'PIPE',
           CA1: elA.CA1, CA2: elA.CA2, CA3: elA.CA3,
-          name: `${refPrefix || 'GAPFIX'}_25mmGapfix`
+          name: `${prefix}_3DTopoBridge_25mmfix`
         };
         updatedTable.push(newPipe);
         fixLog.push({ type: 'Applied/Fix', stage: 'GAP_FIX_25MM', message: `Inserted Pipe between Row ${elA._rowIndex} & ${elB._rowIndex} (${dist.toFixed(1)}mm gap).` });
@@ -168,8 +170,9 @@ export const breakPipeAtPoint = (pipeRow, breakPoint) => {
       return null;
   }
 
-  const rowA = { ...pipeRow, ep2: snapBreak };
-  const rowB = { ...pipeRow, ep1: snapBreak };
+  const baseTag = pipeRow.tag || pipeRow.name || 'PIPE';
+  const rowA = { ...pipeRow, ep2: snapBreak, tag: `${baseTag}_1`, name: `${baseTag}_1` };
+  const rowB = { ...pipeRow, ep1: snapBreak, tag: `${baseTag}_2`, name: `${baseTag}_2` };
   return [rowA, rowB];
 };
 
@@ -191,12 +194,16 @@ export const insertSupportAtPipe = (pipeRow, position = null, attrs = {}) => {
 
   pos = { x: parseFloat(pos.x), y: parseFloat(pos.y), z: parseFloat(pos.z) };
 
+  const prefix = pipeRow.pipelineRef || 'UNKNOWN';
+
   const supportRow = {
     type: 'SUPPORT',
     ep1: { ...pos },
     ep2: { x: pos.x, y: pos.y + 100.0, z: pos.z }, // Fixed +100mm Y stub
     bore: parseFloat(pipeRow.bore) || 0,
-    pipelineRef: pipeRow.pipelineRef || '',
+    pipelineRef: prefix,
+    tag: `${prefix}_3DTopoSupport`,
+    name: `${prefix}_3DTopoSupport`,
     ...attrs
   };
 
