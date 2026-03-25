@@ -412,7 +412,8 @@ export function StatusBar({ activeTab, activeStage }) {
     dispatch({ type: "SET_STATUS_MESSAGE", payload: msg });
   };
 
-  const verString = "Ver 24-03-2026 (1)";
+  const d = new Date();
+  const verString = `Ver 24-03-2026 (1)`;
 
   const handleExecute = () => {
       setShowModal(false);
