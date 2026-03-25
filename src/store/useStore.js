@@ -131,6 +131,10 @@ export const useStore = create((set, get) => ({
   selectedElementId: null,
   hoveredElementId: null,
 
+  // Section Box / Clipping
+  clippingPlaneEnabled: false,
+  setClippingPlaneEnabled: (enabled) => set({ clippingPlaneEnabled: enabled }),
+
   // Sync function to mirror AppContext if required,
   // or act as the standalone state manager.
   setDataTable: (table) => set({ dataTable: table }),

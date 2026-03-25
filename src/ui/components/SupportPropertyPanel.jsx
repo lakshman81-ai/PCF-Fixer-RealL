@@ -10,7 +10,7 @@ export const SupportPropertyPanel = () => {
   const deleteElements = useStore(state => state.deleteElements);
   const pushHistory = useStore(state => state.pushHistory);
 
-  const [attrs, setAttrs] = useState({ CA1: '', CA2: '', CA3: '' });
+  const [attrs, setAttrs] = useState({ SUPPORT_NAME: '', CA1: '', CA2: '', CA3: '' });
 
   const selectedSupports = multiSelectedIds.filter(id => {
     const row = dataTable.find(r => r._rowIndex === id);
@@ -24,6 +24,7 @@ export const SupportPropertyPanel = () => {
       const firstSupport = dataTable.find(r => r._rowIndex === selectedSupports[0]);
       if (firstSupport) {
         setAttrs({
+          SUPPORT_NAME: firstSupport.skey || '',
           CA1: firstSupport.CA1 || '',
           CA2: firstSupport.CA2 || '',
           CA3: firstSupport.CA3 || ''
@@ -35,15 +36,22 @@ export const SupportPropertyPanel = () => {
   const handleApply = () => {
     pushHistory('Support Attr Edit');
 
+    const mappedAttrs = {
+      skey: attrs.SUPPORT_NAME,
+      CA1: attrs.CA1,
+      CA2: attrs.CA2,
+      CA3: attrs.CA3
+    };
+
     // Dispatch to AppContext
     dispatch({
       type: 'BATCH_UPDATE_SUPPORT_ATTRS',
-      payload: { rowIndices: selectedSupports, attrs }
+      payload: { rowIndices: selectedSupports, attrs: mappedAttrs }
     });
 
     // Mirror to Zustand
     const updatedTable = dataTable.map(r =>
-      selectedSupports.includes(r._rowIndex) ? { ...r, ...attrs } : r
+      selectedSupports.includes(r._rowIndex) ? { ...r, ...mappedAttrs } : r
     );
     useStore.getState().setDataTable(updatedTable);
 
@@ -81,15 +89,15 @@ export const SupportPropertyPanel = () => {
       </div>
 
       <div className="p-4 space-y-3">
-        {['CA1', 'CA2', 'CA3'].map(ca => (
-          <div key={ca} className="flex flex-col gap-1">
-            <label className="text-xs text-slate-400 uppercase font-medium">{ca}</label>
+        {['SUPPORT_NAME', 'CA1', 'CA2', 'CA3'].map(attr => (
+          <div key={attr} className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400 uppercase font-medium">{attr.replace('_', ' ')}</label>
             <input
               type="text"
-              value={attrs[ca]}
-              onChange={e => setAttrs({ ...attrs, [ca]: e.target.value })}
+              value={attrs[attr]}
+              onChange={e => setAttrs({ ...attrs, [attr]: e.target.value })}
               className="bg-slate-950 text-slate-200 text-sm p-2 rounded border border-slate-700 focus:border-blue-500 transition-colors"
-              placeholder={`Enter ${ca} value`}
+              placeholder={`Enter ${attr.replace('_', ' ')}`}
             />
           </div>
         ))}
