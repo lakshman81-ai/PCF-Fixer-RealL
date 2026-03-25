@@ -25,6 +25,18 @@ export const SideInspector = () => {
           CA1: el.CA1 || '',
           CA2: el.CA2 || '',
           CA3: el.CA3 || '',
+          CA4: el.CA4 || '',
+          CA5: el.CA5 || '',
+          CA6: el.CA6 || '',
+          CA7: el.CA7 || '',
+          CA8: el.CA8 || '',
+          CA9: el.CA9 || '',
+          CA10: el.CA10 || '',
+          CA97: el.CA97 || '',
+          CA98: el.CA98 || '',
+          PIPING_CLASS: el.PIPING_CLASS || '',
+          RATING: el.RATING || '',
+          LINENO_KEY: el.LINENO_KEY || '',
           skey: el.skey || '',
           pipelineRef: el.pipelineRef || '',
           type: el.type || '',
@@ -181,7 +193,13 @@ export const SideInspector = () => {
               <label className="text-xs text-slate-400">Pipeline Ref</label>
               <input type="text" value={formData.pipelineRef} onChange={(e) => handleChange('pipelineRef', null, e.target.value)} className="bg-slate-950 text-slate-200 text-xs p-1 rounded border border-slate-700" />
             </div>
-            {['CA1', 'CA2', 'CA3', 'skey'].map(attr => (
+            {['skey', 'PIPING_CLASS', 'RATING', 'LINENO_KEY'].map(attr => (
+              <div key={attr} className="flex flex-col gap-1">
+                <label className="text-xs text-slate-400 truncate" title={attr}>{attr}</label>
+                <input type="text" value={formData[attr]} onChange={(e) => handleChange(attr, null, e.target.value)} className="bg-slate-950 text-slate-200 text-xs p-1 rounded border border-slate-700" />
+              </div>
+            ))}
+            {['CA97', 'CA98', 'CA1', 'CA2', 'CA3', 'CA4', 'CA5', 'CA6', 'CA7', 'CA8', 'CA9', 'CA10'].map(attr => (
               <div key={attr} className="flex flex-col gap-1">
                 <label className="text-xs text-slate-400">{attr}</label>
                 <input type="text" value={formData[attr]} onChange={(e) => handleChange(attr, null, e.target.value)} className="bg-slate-950 text-slate-200 text-xs p-1 rounded border border-slate-700" />

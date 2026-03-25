@@ -11,6 +11,8 @@ import { SideInspector } from '../components/SideInspector';
 import { LogDrawer } from '../components/LogDrawer';
 import { SceneHealthHUD } from '../components/SceneHealthHUD';
 import { SupportPropertyPanel } from '../components/SupportPropertyPanel';
+import { PipelinePropertyPanel } from '../components/PipelinePropertyPanel';
+import { ClippingPlanesLayer, ClippingPanelUI } from '../components/ClippingPlanesLayer';
 
 // ----------------------------------------------------
 // Colour & geometry helpers per component type
@@ -202,7 +204,14 @@ const InstancedPipes = () => {
 
               setSelectedGeom({ pos: [midX, midY, midZ], dist: distance, radius, quat: quaternion });
 
-              useStore.getState().setSelected(pipe._rowIndex);
+              const isMultiSelect = e.ctrlKey || e.metaKey;
+              if (isMultiSelect) {
+                  useStore.getState().toggleMultiSelect(pipe._rowIndex);
+              } else {
+                  useStore.getState().clearMultiSelect();
+                  useStore.getState().setSelected(pipe._rowIndex);
+                  useStore.getState().setMultiSelect([pipe._rowIndex]);
+              }
 
               // Do not dispatch canvas-focus-point automatically anymore.
               // Instead, we just set the selection for the property panel.
@@ -210,9 +219,12 @@ const InstancedPipes = () => {
       }
   };
 
-  const handlePointerMissed = () => {
+  const handlePointerMissed = (e) => {
+      // Don't clear if Ctrl is held down, allows multi-select to stay persistent across blank clicks
+      if (e && (e.ctrlKey || e.metaKey)) return;
       setSelectedGeom(null);
       useStore.getState().setSelected(null);
+      useStore.getState().clearMultiSelect();
   };
 
   if (pipes.length === 0) return null;
@@ -279,7 +291,14 @@ const ImmutableComponents = () => {
 
         const handleSelect = (e) => {
           e.stopPropagation();
-          useStore.getState().setSelected(el._rowIndex);
+          const isMultiSelect = e.ctrlKey || e.metaKey;
+          if (isMultiSelect) {
+              useStore.getState().toggleMultiSelect(el._rowIndex);
+          } else {
+              useStore.getState().clearMultiSelect();
+              useStore.getState().setSelected(el._rowIndex);
+              useStore.getState().setMultiSelect([el._rowIndex]);
+          }
         };
 
         if (type === 'FLANGE') {
@@ -1036,6 +1055,7 @@ const MarqueeLayer = () => {
         if (canvasMode === 'MARQUEE_SELECT') {
             setMultiSelect(selected.map(e => e._rowIndex));
         } else if (canvasMode === 'MARQUEE_ZOOM' && selected.length > 0) {
+            setMultiSelect(selected.map(e => e._rowIndex));
             window.dispatchEvent(new CustomEvent('canvas-auto-center', { detail: { elements: selected } }));
         }
 
@@ -1484,22 +1504,22 @@ const GapRadarLayer = () => {
                 return (
                     <group key={`gap-${i}`}>
                         {/* Glow effect */}
-                        <Line points={[gap.ptA, gap.ptB]} color={color} lineWidth={12} transparent opacity={0.3} />
+                        <Line points={[gap.ptA, gap.ptB]} color={color} lineWidth={12} transparent opacity={0.3} depthTest={false} />
                         {/* Core line */}
-                        <Line points={[gap.ptA, gap.ptB]} color={color} lineWidth={4} dashed dashSize={5} gapSize={2} />
+                        <Line points={[gap.ptA, gap.ptB]} color={color} lineWidth={4} dashed dashSize={5} gapSize={2} depthTest={false} />
 
                         {/* Spheres at endpoints for visibility */}
                         <mesh position={gap.ptA}>
                             <sphereGeometry args={[10, 16, 16]} />
-                            <meshBasicMaterial color={color} transparent opacity={0.7} />
+                            <meshBasicMaterial color={color} transparent opacity={0.7} depthTest={false} />
                         </mesh>
                         <mesh position={gap.ptB}>
                             <sphereGeometry args={[10, 16, 16]} />
-                            <meshBasicMaterial color={color} transparent opacity={0.7} />
+                            <meshBasicMaterial color={color} transparent opacity={0.7} depthTest={false} />
                         </mesh>
 
                         {/* Billboard text */}
-                        <Text position={[gap.mid.x, gap.mid.y + 15, gap.mid.z]} color={color} fontSize={20} fontWeight="bold" anchorX="center" outlineWidth={2} outlineColor="#000">
+                        <Text position={[gap.mid.x, gap.mid.y + 15, gap.mid.z]} color={color} fontSize={20} fontWeight="bold" anchorX="center" outlineWidth={2} outlineColor="#000" depthTest={false}>
                             ⚠ {gap.dist.toFixed(1)}mm Gap
                         </Text>
                     </group>
@@ -1831,6 +1851,8 @@ export function CanvasTab() {
   const dragAxisLock = useStore(state => state.dragAxisLock);
   const setDragAxisLock = useStore(state => state.setDragAxisLock);
   const undo = useStore(state => state.undo);
+  const clippingPlaneEnabled = useStore(state => state.clippingPlaneEnabled);
+  const setClippingPlaneEnabled = useStore(state => state.setClippingPlaneEnabled);
   const clearMultiSelect = useStore(state => state.clearMultiSelect);
   const multiSelectedIds = useStore(state => state.multiSelectedIds);
   const deleteElements = useStore(state => state.deleteElements);
@@ -2056,6 +2078,8 @@ export function CanvasTab() {
       <LegendLayer />
       <SideInspector />
       <SupportPropertyPanel />
+      <PipelinePropertyPanel />
+        <ClippingPanelUI />
       <LogDrawer />
       <HoverTooltip />
 
@@ -2088,11 +2112,25 @@ export function CanvasTab() {
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 1 0 2.829 2.828z"/><path d="m6.3 14.5-4 4"/><path d="m16 5.3-4 4"/></svg>
                 </button>
                 <button
+                    onClick={() => setClippingPlaneEnabled(!clippingPlaneEnabled)}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition ${clippingPlaneEnabled ? 'bg-slate-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                    title="Toggle Section Box"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v18"/><path d="M3 12h18"/><path d="M3 3h18v18H3z"/></svg>
+                </button>
+                <button
                     onClick={() => setCanvasMode(canvasMode === 'INSERT_SUPPORT' ? 'VIEW' : 'INSERT_SUPPORT')}
                     className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'INSERT_SUPPORT' ? 'bg-green-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
                     title="INSERT SUPPORT Mode (S)"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                </button>
+                <button
+                    onClick={() => setCanvasMode(canvasMode === 'ASSIGN_PIPELINE' ? 'VIEW' : 'ASSIGN_PIPELINE')}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition ${canvasMode === 'ASSIGN_PIPELINE' ? 'bg-purple-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                    title="Assign Pipeline Ref Mode"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 </button>
                 <button
                     onClick={() => setCanvasMode(canvasMode === 'MARQUEE_SELECT' ? 'VIEW' : 'MARQUEE_SELECT')}
@@ -2234,6 +2272,7 @@ export function CanvasTab() {
         <InsertSupportLayer />
         <EPLabelsLayer />
         <MarqueeLayer />
+        <ClippingPlanesLayer />
 
         {(() => {
             const allIssues = [
